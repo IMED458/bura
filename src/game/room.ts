@@ -234,6 +234,24 @@ export class BuraRoom {
     return { success: true };
   }
 
+  /** Start a brand-new match after one finished: reset scores and re-deal. */
+  newMatch(uid: string): ActionResult {
+    const state = this.state;
+    const player = state.players.find((p) => p.id === uid);
+    if (!player || !player.isHost) return { success: false, error: 'მხოლოდ ჰოსტს შეუძლია' };
+
+    state.team1MatchScore = 0;
+    state.team2MatchScore = 0;
+    state.roundNumber = 1;
+    state.dealerPosition = 'south';
+    const { state: newState, cardsByPlayer, deck } = initializeRound(state, this.hands, createDeck());
+    this.state = newState;
+    this.hands = cardsByPlayer;
+    this.deck = deck;
+    this.say('ახალი მატჩი დაიწყო! კოზირია: ' + newState.trumpSuit, 'join');
+    return { success: true };
+  }
+
   // ---- gameplay ------------------------------------------------------------
 
   playCards(uid: string, cardIds: string[]): ActionResult {

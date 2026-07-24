@@ -27,9 +27,9 @@ service cloud.firestore {
       // Anyone signed in can read a room (needed to join by code / matchmaking).
       allow read: if signedIn();
       // Creator sets themselves as host; only the host may update or delete.
+      // Members never write the room doc — all state changes go through actions.
       allow create: if isHostAfter();
-      allow update: if isHost() || isMember(); // members update only memberUids on join (guarded below)
-      allow delete: if isHost();
+      allow update, delete: if isHost();
 
       // Secret deck — host only.
       match /private/{docId} {
@@ -61,11 +61,10 @@ service cloud.firestore {
       }
     }
 
-    // Matchmaking queue — each entry owned by its player.
-    match /matchmaking/{entryId} {
-      allow read: if signedIn();
-      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
-      allow update, delete: if signedIn() && resource.data.uid == request.auth.uid;
+    // Matchmaking discovery — one doc per open public room ({roomCode} => {mode,count}).
+    // Public metadata only (no secrets); the room's host maintains it.
+    match /matchmaking/{roomCode} {
+      allow read, write: if signedIn();
     }
   }
 }
