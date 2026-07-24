@@ -6,6 +6,7 @@ interface CardSvgProps {
   faceDown?: boolean;
   selected?: boolean;
   isTrump?: boolean;
+  trumpMark?: boolean;
   onClick?: () => void;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
@@ -16,6 +17,7 @@ export const CardSvg: React.FC<CardSvgProps> = ({
   faceDown = false,
   selected = false,
   isTrump = false,
+  trumpMark = false,
   onClick,
   size = 'md',
   className = '',
@@ -42,6 +44,21 @@ export const CardSvg: React.FC<CardSvgProps> = ({
     md: 'w-16 h-24 sm:w-20 sm:h-28 text-sm',
     lg: 'w-24 h-36 sm:w-28 sm:h-40 text-base',
   }[size];
+  const cornerText = {
+    sm: 'text-[10px]',
+    md: 'text-xs sm:text-sm',
+    lg: 'text-sm sm:text-base',
+  }[size];
+  const suitText = {
+    sm: 'text-[10px]',
+    md: 'text-xs sm:text-sm',
+    lg: 'text-sm sm:text-base',
+  }[size];
+  const centerText = {
+    sm: 'text-xl',
+    md: 'text-2xl sm:text-3xl',
+    lg: 'text-3xl sm:text-4xl',
+  }[size];
 
   if (faceDown || !card) {
     return (
@@ -67,29 +84,29 @@ export const CardSvg: React.FC<CardSvgProps> = ({
       className={`relative rounded-xl border bg-white p-1.5 shadow-md transition-all duration-200 select-none cursor-pointer ${dimensions} ${colorClass} ${
         selected
           ? '-translate-y-4 ring-4 ring-amber-400 shadow-xl z-20 border-amber-400'
-          : 'hover:-translate-y-1 hover:shadow-lg border-slate-200'
+          : `hover:-translate-y-1 hover:shadow-lg ${isTrump ? 'border-amber-400 ring-1 ring-amber-300/70' : 'border-slate-200'}`
       } ${className}`}
     >
-      {isTrump && (
-        <span className="absolute -top-1.5 -right-1.5 bg-amber-400 text-amber-950 font-black text-[9px] px-1 py-0.5 rounded-full shadow border border-amber-200 z-10">
-          კოზირი
+      {trumpMark && (
+        <span className="absolute -top-1.5 -right-1.5 bg-amber-400 text-amber-950 font-black text-[10px] w-5 h-5 rounded-full shadow border border-amber-200 z-10 flex items-center justify-center">
+          კ
         </span>
       )}
 
-      <div className="flex flex-col justify-between h-full">
+      <div className="grid h-full grid-rows-[auto_1fr_auto]">
         {/* Top Left Rank & Suit */}
         <div className="flex flex-col items-start leading-none">
-          <span className="font-extrabold tracking-tight text-sm sm:text-base">{card.rank}</span>
-          <span className="text-xs sm:text-sm">{symbol}</span>
+          <span className={`font-extrabold tracking-tight ${cornerText}`}>{card.rank}</span>
+          <span className={suitText}>{symbol}</span>
         </div>
 
         {/* Center Suit Symbol */}
-        <div className="self-center text-2xl sm:text-3xl my-auto opacity-90">{symbol}</div>
+        <div className={`self-center justify-self-center ${centerText} opacity-90`}>{symbol}</div>
 
         {/* Bottom Right Rank & Suit */}
         <div className="flex flex-col items-end leading-none rotate-180">
-          <span className="font-extrabold tracking-tight text-sm sm:text-base">{card.rank}</span>
-          <span className="text-xs sm:text-sm">{symbol}</span>
+          <span className={`font-extrabold tracking-tight ${cornerText}`}>{card.rank}</span>
+          <span className={suitText}>{symbol}</span>
         </div>
       </div>
     </div>

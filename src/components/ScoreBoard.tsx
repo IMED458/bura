@@ -1,8 +1,7 @@
 import React from 'react';
 import { Card, Suit } from '../types/game';
 import { ge } from '../i18n/ge';
-import { CardSvg } from './CardSvg';
-import { Layers } from 'lucide-react';
+import { Flame, Layers } from 'lucide-react';
 
 interface ScoreBoardProps {
   team1MatchScore: number;
@@ -12,9 +11,12 @@ interface ScoreBoardProps {
   team1TakenCardCount: number;
   team2TakenCardCount: number;
   targetMatchScore: number;
+  currentRaiseLevel: number;
   trumpCard: Card | null;
   trumpSuit: Suit | null;
   deckRemainingCount: number;
+  onProposeRaise?: (level: any) => void;
+  canRaise?: boolean;
 }
 
 export const ScoreBoard: React.FC<ScoreBoardProps> = ({
@@ -25,9 +27,21 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
   team1TakenCardCount,
   team2TakenCardCount,
   targetMatchScore,
-  trumpCard,
+  currentRaiseLevel,
   deckRemainingCount,
+  onProposeRaise,
+  canRaise = false,
 }) => {
+  const levelNames: Record<number, string> = {
+    1: 'ჩვეულებრივი',
+    2: ge.davi,
+    3: ge.se,
+    4: ge.chari,
+    5: ge.fanji,
+    6: ge.shashi,
+  };
+  const nextRaiseLevel = (currentRaiseLevel + 1) as any;
+
   return (
     <div className="w-full bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-2xl p-3 shadow-xl text-slate-100 flex flex-col md:flex-row items-center justify-between gap-4">
       {/* Match & Round Scores */}
@@ -59,25 +73,27 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
           <div>
             {ge.matchScore} <span className="font-bold text-amber-400">{targetMatchScore}</span>)
           </div>
-          <div>რაუნდის ფასი <span className="font-bold text-amber-300">1 ქულა</span></div>
+          <div>რაუნდის ფასი <span className="font-bold text-amber-300">{levelNames[currentRaiseLevel] || currentRaiseLevel}</span></div>
         </div>
       </div>
 
       {/* Trump & Deck Status */}
       <div className="flex items-center gap-4">
+        {canRaise && currentRaiseLevel < 6 && (
+          <button
+            onClick={() => onProposeRaise?.(nextRaiseLevel)}
+            className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-3 py-2 rounded-xl text-xs shadow-md transition-colors"
+          >
+            <Flame className="w-4 h-4" />
+            <span>{levelNames[nextRaiseLevel]}</span>
+          </button>
+        )}
+
         {/* Deck Count */}
         <div className="flex items-center gap-1.5 text-xs text-slate-300 bg-slate-950/40 px-2.5 py-1.5 rounded-xl border border-slate-800">
           <Layers className="w-4 h-4 text-amber-400" />
           <span>{deckRemainingCount} კარტი</span>
         </div>
-
-        {/* Trump Card */}
-        {trumpCard && (
-          <div className="flex items-center gap-2 bg-slate-950/40 p-1.5 rounded-xl border border-slate-800">
-            <span className="text-[10px] text-slate-400 font-bold uppercase">კოზირი:</span>
-            <CardSvg card={trumpCard} size="sm" isTrump />
-          </div>
-        )}
       </div>
     </div>
   );

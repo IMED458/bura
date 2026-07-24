@@ -403,9 +403,24 @@ export class BuraRoom {
   }
 
   proposeRaise(uid: string, level: RaiseLevel): ActionResult {
-    void uid;
-    void level;
-    return { success: false, error: 'გაზრდა გამორთულია' };
+    const state = this.state;
+    if (state.phase !== 'TURN_IN_PROGRESS') return { success: false, error: 'დავი მხოლოდ თამაშისას' };
+    const player = state.players.find((p) => p.id === uid);
+    if (!player) return { success: false, error: 'მოთამაშე ვერ მოიძებნა' };
+    if (level <= state.currentRaiseLevel) return { success: false, error: 'გაზრდა უფრო მაღალი უნდა იყოს' };
+
+    state.phase = 'RAISE_OFFER_PENDING';
+    state.pendingRaise = {
+      proposedByPlayerId: uid,
+      proposedByTeam: player.team,
+      level,
+      timestamp: Date.now(),
+    };
+    const names: Record<number, string> = {
+      2: 'დავი (2 ქულა)', 3: 'სე (3 ქულა)', 4: 'ჩარი (4 ქულა)', 5: 'ფანჯი (5 ქულა)', 6: 'შაში (6 ქულა)',
+    };
+    this.say(`${player.name} გამოაცხადა ${names[level] || 'გაზრდა'}!`, 'davi');
+    return { success: true };
   }
 
   respondRaise(uid: string, accept: boolean): ActionResult {

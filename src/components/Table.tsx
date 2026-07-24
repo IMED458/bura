@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Card, GameState, Player, PlayerPosition, Rank, Suit } from '../types/game';
 import { CardSvg } from './CardSvg';
 import { soundEffects } from '../utils/audio';
-import { Flame, Clock, User, WifiOff, CheckCircle2 } from 'lucide-react';
+import { User, WifiOff, CheckCircle2 } from 'lucide-react';
 import { ge } from '../i18n/ge';
 
 interface TableProps {
@@ -141,6 +141,13 @@ export const Table: React.FC<TableProps> = ({
       {/* Table Center Felt Ring */}
       <div className="absolute inset-16 sm:inset-20 rounded-full border border-emerald-500/20 bg-emerald-900/20 pointer-events-none" />
 
+      {state.trumpCard && (
+        <div className="absolute top-4 right-4 z-20 flex flex-col items-center gap-1 bg-emerald-950/75 border border-amber-400/50 rounded-2xl px-2 py-2 shadow-xl backdrop-blur-md">
+          <CardSvg card={state.trumpCard} size="sm" isTrump trumpMark />
+          <span className="text-[10px] font-black text-amber-300">კოზირი</span>
+        </div>
+      )}
+
       {/* TOP SEAT (NORTH - PARTNER) */}
       <div className="relative z-10 flex flex-col items-center gap-1">
         {renderPlayerBadge(northPlayer, 'north')}
@@ -273,6 +280,7 @@ export const Table: React.FC<TableProps> = ({
                 card={card}
                 selected={isSelected}
                 isTrump={isTrump}
+                trumpMark={state.trumpCard?.id === card.id}
                 onClick={() => toggleSelectCard(card)}
                 size="md"
               />

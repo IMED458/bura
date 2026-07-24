@@ -129,6 +129,7 @@ export default function App() {
   const handleNextRound = () => clientRef.current?.nextRound();
   const handleNewMatch = () => clientRef.current?.newMatch();
   const handlePlayCards = (cardIds: string[]) => clientRef.current?.playCards(cardIds);
+  const handleProposeRaise = (level: any) => { clientRef.current?.proposeRaise(level); soundEffects.playDaviRaise(); };
   const handleRespondRaise = (accept: boolean) => clientRef.current?.respondRaise(accept);
   const handleDeclareBura = () => clientRef.current?.declareBura();
   const handleSendChat = (text: string) => clientRef.current?.sendChat(name.trim() || 'მოთამაშე', text);
@@ -262,9 +263,12 @@ export default function App() {
               team1TakenCardCount={gameState.team1TakenCardCount || 0}
               team2TakenCardCount={gameState.team2TakenCardCount || 0}
               targetMatchScore={gameState.settings.targetMatchScore}
+              currentRaiseLevel={gameState.currentRaiseLevel}
               trumpCard={gameState.trumpCard}
               trumpSuit={gameState.trumpSuit}
               deckRemainingCount={gameState.deckRemainingCount}
+              onProposeRaise={handleProposeRaise}
+              canRaise={gameState.phase === 'TURN_IN_PROGRESS'}
             />
           </div>
         )}
