@@ -12,7 +12,7 @@ import { GameOverModal } from './components/GameOverModal';
 import { HowToPlayModal } from './components/HowToPlayModal';
 import { soundEffects } from './utils/audio';
 import { ge } from './i18n/ge';
-import { MessageSquare, Volume2, VolumeX, BookOpen } from 'lucide-react';
+import { MessageSquare, Volume2, VolumeX, BookOpen, LogOut } from 'lucide-react';
 
 export default function App() {
   const [name, setName] = useState<string>(() => localStorage.getItem('bura_name') || '');
@@ -129,7 +129,6 @@ export default function App() {
   const handleNextRound = () => clientRef.current?.nextRound();
   const handleNewMatch = () => clientRef.current?.newMatch();
   const handlePlayCards = (cardIds: string[]) => clientRef.current?.playCards(cardIds);
-  const handleProposeRaise = (level: any) => { clientRef.current?.proposeRaise(level); soundEffects.playDaviRaise(); };
   const handleRespondRaise = (accept: boolean) => clientRef.current?.respondRaise(accept);
   const handleDeclareBura = () => clientRef.current?.declareBura();
   const handleSendChat = (text: string) => clientRef.current?.sendChat(name.trim() || 'მოთამაშე', text);
@@ -180,6 +179,16 @@ export default function App() {
 
           {gameState && (
             <button
+              onClick={handleLeaveRoom}
+              className="p-2 bg-red-950/70 hover:bg-red-900 text-red-200 rounded-xl border border-red-800 text-xs font-bold transition-colors flex items-center gap-1.5"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">გასვლა</span>
+            </button>
+          )}
+
+          {gameState && (
+            <button
               onClick={openChat}
               className="relative p-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-bold transition-colors shadow-md"
             >
@@ -227,26 +236,25 @@ export default function App() {
           />
         ) : (
           <div className="flex flex-col gap-4">
-            <ScoreBoard
-              team1MatchScore={gameState.team1MatchScore}
-              team2MatchScore={gameState.team2MatchScore}
-              team1TrickPoints={gameState.team1TrickPoints}
-              team2TrickPoints={gameState.team2TrickPoints}
-              targetMatchScore={gameState.settings.targetMatchScore}
-              currentRaiseLevel={gameState.currentRaiseLevel}
-              trumpCard={gameState.trumpCard}
-              trumpSuit={gameState.trumpSuit}
-              deckRemainingCount={gameState.deckRemainingCount}
-              onProposeRaise={handleProposeRaise}
-              canRaise={gameState.phase === 'TURN_IN_PROGRESS'}
-            />
-
             <Table
               state={gameState}
               hand={hand}
               myPlayerId={myPlayerId}
               onPlayCards={handlePlayCards}
               onDeclareBura={handleDeclareBura}
+            />
+
+            <ScoreBoard
+              team1MatchScore={gameState.team1MatchScore}
+              team2MatchScore={gameState.team2MatchScore}
+              team1TrickPoints={gameState.team1TrickPoints}
+              team2TrickPoints={gameState.team2TrickPoints}
+              team1TakenCardCount={gameState.team1TakenCardCount || 0}
+              team2TakenCardCount={gameState.team2TakenCardCount || 0}
+              targetMatchScore={gameState.settings.targetMatchScore}
+              trumpCard={gameState.trumpCard}
+              trumpSuit={gameState.trumpSuit}
+              deckRemainingCount={gameState.deckRemainingCount}
             />
           </div>
         )}

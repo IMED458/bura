@@ -22,6 +22,8 @@ import { RaiseLevel } from '../types/game';
 
 // Firestore rejects `undefined`; JSON round-trip strips it from plain data.
 const clean = <T>(v: T): T => JSON.parse(JSON.stringify(v));
+const TRICK_REVEAL_DELAY_MS = 2400;
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export interface ActionDoc {
   uid: string;
@@ -129,6 +131,13 @@ export class HostEngine {
     }
 
     await this.persistAll();
+
+    if (this.room.state.phase === 'TRICK_RESOLUTION') {
+      await wait(TRICK_REVEAL_DELAY_MS);
+      this.room.resolvePendingTrick();
+      await this.persistAll();
+    }
+
     await deleteDoc(doc(this.db, 'rooms', this.code, 'actions', actionId));
     if (!this.room.state.isPrivate) await this.updateMatchmaking();
   }

@@ -232,6 +232,8 @@ export function initializeRound(
     requiredCardCount: 0,
     team1TrickPoints: 0,
     team2TrickPoints: 0,
+    team1TakenCardCount: 0,
+    team2TakenCardCount: 0,
     currentRaiseLevel: 1,
     pendingRaise: null,
     winningTeam: null,

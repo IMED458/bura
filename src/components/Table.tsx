@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Card, GameState, Player, PlayerPosition } from '../types/game';
+import React, { useMemo, useState } from 'react';
+import { Card, GameState, Player, PlayerPosition, Rank, Suit } from '../types/game';
 import { CardSvg } from './CardSvg';
 import { soundEffects } from '../utils/audio';
 import { Flame, Clock, User, WifiOff, CheckCircle2 } from 'lucide-react';
@@ -12,6 +12,9 @@ interface TableProps {
   onPlayCards: (cardIds: string[]) => void;
   onDeclareBura: () => void;
 }
+
+const SUIT_ORDER: Record<Suit, number> = { hearts: 0, diamonds: 1, clubs: 2, spades: 3 };
+const RANK_ORDER: Record<Rank, number> = { A: 0, '10': 1, K: 2, Q: 3, J: 4, '9': 5, '8': 6, '7': 7, '6': 8 };
 
 export const Table: React.FC<TableProps> = ({
   state,
@@ -41,6 +44,10 @@ export const Table: React.FC<TableProps> = ({
 
   const isMyTurn = state.currentTurnPosition === myPosition;
   const isTwoPlayer = state.settings.playerCount === 2;
+  const sortedHand = useMemo(
+    () => [...hand].sort((a, b) => SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit] || RANK_ORDER[a.rank] - RANK_ORDER[b.rank]),
+    [hand]
+  );
 
   const toggleSelectCard = (card: Card) => {
     soundEffects.playCardSnap();
@@ -74,6 +81,9 @@ export const Table: React.FC<TableProps> = ({
 
     const isCurrentTurn = state.currentTurnPosition === player.position;
     const isDealer = state.dealerPosition === player.position;
+    const takenCardCount = player.team === 1
+      ? state.team1TakenCardCount || 0
+      : state.team2TakenCardCount || 0;
 
     return (
       <div
@@ -105,6 +115,9 @@ export const Table: React.FC<TableProps> = ({
           </div>
           <span className="text-[9px] text-slate-400">
             გუნდი {player.team} • {player.cardsInHandCount} კარტი
+          </span>
+          <span className="text-[9px] text-emerald-300/80">
+            წაყვანილი {takenCardCount} კარტი
           </span>
         </div>
 
@@ -173,9 +186,9 @@ export const Table: React.FC<TableProps> = ({
                     }`}
                   >
                     <span className="text-[10px] font-bold text-slate-300 mb-1">
-                      {state.players.find((p) => p.id === trick.playerId)?.name || trick.playerPosition}
+                      {state.players.find((p) => p.id === trick.playerId)?.name || trick.playerPosition} ჩამოვიდა
                     </span>
-                    <div className="flex -space-x-3">
+                    <div className="flex -space-x-2">
                       {trick.cards.map((card) => (
                         <CardSvg key={card.id} card={card} size="sm" isTrump={card.suit === state.trumpSuit} />
                       ))}
@@ -231,7 +244,7 @@ export const Table: React.FC<TableProps> = ({
 
         {/* Player's Cards in Hand */}
         <div className="flex items-center justify-center -space-x-3 sm:-space-x-4 max-w-full overflow-x-auto p-1">
-          {hand.map((card) => {
+          {sortedHand.map((card) => {
             const isSelected = selectedCardIds.includes(card.id);
             const isTrump = card.suit === state.trumpSuit;
 

@@ -88,6 +88,8 @@ export interface GameState {
   // Scores
   team1TrickPoints: number; // South & North accumulated trick points in current round
   team2TrickPoints: number; // West & East accumulated trick points in current round
+  team1TakenCardCount: number; // Public count of captured cards in current round
+  team2TakenCardCount: number; // Public count of captured cards in current round
   team1MatchScore: number;  // Team 1 match wins/points
   team2MatchScore: number;  // Team 2 match wins/points
   

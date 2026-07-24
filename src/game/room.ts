@@ -94,6 +94,8 @@ export class BuraRoom {
       requiredCardCount: 0,
       team1TrickPoints: 0,
       team2TrickPoints: 0,
+      team1TakenCardCount: 0,
+      team2TakenCardCount: 0,
       team1MatchScore: 0,
       team2MatchScore: 0,
       currentRaiseLevel: 1,
@@ -300,11 +302,20 @@ export class BuraRoom {
     });
 
     if (state.currentTrickCards.length === state.settings.playerCount) {
-      this.resolveTrick();
+      state.phase = 'TRICK_RESOLUTION';
+      state.turnDeadline = null;
     } else {
       state.currentTurnPosition = getNextPosition(state.currentTurnPosition, state.settings.playerCount);
       state.turnDeadline = Date.now() + (state.settings.turnTimeSeconds || 30) * 1000;
     }
+    return { success: true };
+  }
+
+  resolvePendingTrick(): ActionResult {
+    if (this.state.phase !== 'TRICK_RESOLUTION') {
+      return { success: false, error: 'დასასრულებელი ხელი არ არის' };
+    }
+    this.resolveTrick();
     return { success: true };
   }
 
@@ -315,8 +326,11 @@ export class BuraRoom {
     const winningTeam = winner ? winner.team : getTeamForPosition(winnerPos, state.settings.playerCount);
 
     const points = calculateCardPoints(state.currentTrickCards.flatMap((t) => t.cards));
+    const takenCards = state.currentTrickCards.reduce((sum, trick) => sum + trick.cards.length, 0);
     if (winningTeam === 1) state.team1TrickPoints += points;
     else state.team2TrickPoints += points;
+    if (winningTeam === 1) state.team1TakenCardCount += takenCards;
+    else state.team2TakenCardCount += takenCards;
 
     this.say(`${winner?.name || winnerPos} მოიგო ხელი (+${points} ქულა)`, 'trick_win');
 
@@ -332,6 +346,7 @@ export class BuraRoom {
     if (totalHandCards === 0 && this.deck.length === 0) {
       this.resolveRound();
     } else {
+      state.phase = 'TURN_IN_PROGRESS';
       state.turnDeadline = Date.now() + (state.settings.turnTimeSeconds || 30) * 1000;
     }
   }
@@ -388,24 +403,9 @@ export class BuraRoom {
   }
 
   proposeRaise(uid: string, level: RaiseLevel): ActionResult {
-    const state = this.state;
-    if (state.phase !== 'TURN_IN_PROGRESS') return { success: false, error: 'დავი მხოლოდ თამაშისას' };
-    const player = state.players.find((p) => p.id === uid);
-    if (!player) return { success: false, error: 'მოთამაშე ვერ მოიძებნა' };
-    if (level <= state.currentRaiseLevel) return { success: false, error: 'გაზრდა უფრო მაღალი უნდა იყოს' };
-
-    state.phase = 'RAISE_OFFER_PENDING';
-    state.pendingRaise = {
-      proposedByPlayerId: uid,
-      proposedByTeam: player.team,
-      level,
-      timestamp: Date.now(),
-    };
-    const names: Record<number, string> = {
-      2: 'დავი (2 ქულა)', 3: 'სე (3 ქულა)', 4: 'ჩარი (4 ქულა)', 5: 'ფანჯი (5 ქულა)', 6: 'შაში (6 ქულა)',
-    };
-    this.say(`${player.name} გამოაცხადა ${names[level] || 'გაზრდა'}!`, 'davi');
-    return { success: true };
+    void uid;
+    void level;
+    return { success: false, error: 'გაზრდა გამორთულია' };
   }
 
   respondRaise(uid: string, accept: boolean): ActionResult {

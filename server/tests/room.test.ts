@@ -30,8 +30,13 @@ function playFullGame(playerCount: 2 | 4) {
   const uidByPos = (pos: string) => room.state.players.find((p) => p.position === pos)!.id;
 
   let guard = 0;
-  while (room.state.phase === 'TURN_IN_PROGRESS' && guard < 500) {
+  while ((room.state.phase === 'TURN_IN_PROGRESS' || room.state.phase === 'TRICK_RESOLUTION') && guard < 500) {
     guard++;
+    if (room.state.phase === 'TRICK_RESOLUTION') {
+      const resolved = room.resolvePendingTrick();
+      if (!resolved.success) assert(false, `${playerCount}p: ხელის დასრულება ვერ მოხერხდა — ${resolved.error}`);
+      continue;
+    }
     const uid = uidByPos(room.state.currentTurnPosition);
     const hand = room.hands.get(uid) || [];
     if (hand.length === 0) break;
@@ -45,6 +50,8 @@ function playFullGame(playerCount: 2 | 4) {
   );
   const total = room.state.team1TrickPoints + room.state.team2TrickPoints;
   assert(total === 120, `${playerCount}p: ხელის ქულების ჯამი = 120 (მიღებული ${total})`);
+  const taken = room.state.team1TakenCardCount + room.state.team2TakenCardCount;
+  assert(taken === 36, `${playerCount}p: წაყვანილი კარტების ჯამი = 36 (მიღებული ${taken})`);
   assert(room.deck.length === 0, `${playerCount}p: დასტა ბოლომდე დაცარიელდა`);
 
   // No duplicate card ids anywhere (the deck-persistence bug regression guard).
