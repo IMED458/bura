@@ -83,6 +83,7 @@ export class GameClient {
     this.host = new HostEngine(code, room, this.db);
     await this.host.startAsCreator();
     this.subscribe(code);
+    localStorage.setItem('bura_room_code', code);
     return code;
   }
 
@@ -107,7 +108,35 @@ export class GameClient {
       }
     }
     await this.sendActionTo(clean, 'JOIN', { name, autoReady });
-    this.subscribe(clean);
+    await this.attachRoom(clean);
+  }
+
+  async resumeRoom(code: string, name: string): Promise<boolean> {
+    await this.init();
+    const clean = code.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+    const snap = await getDoc(doc(this.db, 'rooms', clean));
+    if (!snap.exists()) return false;
+
+    const st = snap.data() as any;
+    if (!(st.players || []).some((p: any) => p.id === this.uid)) return false;
+
+    await this.attachRoom(clean);
+    await this.sendActionTo(clean, 'JOIN', { name, autoReady: false });
+    return true;
+  }
+
+  private async attachRoom(code: string) {
+    const snap = await getDoc(doc(this.db, 'rooms', code));
+    const st = snap.exists() ? (snap.data() as any) : null;
+    if (st?.hostUid === this.uid && !this.host) {
+      const host = await HostEngine.rehydrate(code, this.db);
+      if (host) {
+        this.host = host;
+        this.host.attach();
+      }
+    }
+    this.subscribe(code);
+    localStorage.setItem('bura_room_code', code);
   }
 
   async startMatchmaking(name: string, mode: PlayerCount): Promise<void> {
@@ -152,6 +181,12 @@ export class GameClient {
     this.unsubs = [];
   }
 
+  disconnectLocal() {
+    this.unsubClearRoom();
+    if (this.host) { this.host.stop(); this.host = null; }
+    this.code = null;
+  }
+
   private async sendActionTo(code: string, type: string, payload?: any) {
     await addDoc(collection(this.db, 'rooms', code, 'actions'), {
       uid: this.uid,
@@ -188,8 +223,7 @@ export class GameClient {
 
   async leave() {
     if (this.code) await this.sendAction('LEAVE').catch(() => {});
-    this.unsubClearRoom();
-    if (this.host) { this.host.stop(); this.host = null; }
-    this.code = null;
+    localStorage.removeItem('bura_room_code');
+    this.disconnectLocal();
   }
 }

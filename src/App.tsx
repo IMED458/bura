@@ -73,10 +73,18 @@ export default function App() {
       },
     }, { db, auth });
     clientRef.current = client;
-    client.init().then((uid) => setMyPlayerId(uid)).catch(() => {
+    client.init().then(async (uid) => {
+      setMyPlayerId(uid);
+      const savedCode = localStorage.getItem('bura_room_code');
+      const savedName = localStorage.getItem('bura_name') || name;
+      if (savedCode && savedName.trim()) {
+        const resumed = await client.resumeRoom(savedCode, savedName.trim());
+        if (!resumed) localStorage.removeItem('bura_room_code');
+      }
+    }).catch(() => {
       setErrorMsg('Firebase-თან დაკავშირება ვერ მოხერხდა');
     });
-    return () => { client.leave(); };
+    return () => { client.disconnectLocal(); };
   }, []);
 
   useEffect(() => { if (name) localStorage.setItem('bura_name', name); }, [name]);
@@ -258,14 +266,10 @@ export default function App() {
             <ScoreBoard
               team1MatchScore={gameState.team1MatchScore}
               team2MatchScore={gameState.team2MatchScore}
-              team1TrickPoints={gameState.team1TrickPoints}
-              team2TrickPoints={gameState.team2TrickPoints}
               team1TakenCardCount={gameState.team1TakenCardCount || 0}
               team2TakenCardCount={gameState.team2TakenCardCount || 0}
               targetMatchScore={gameState.settings.targetMatchScore}
               currentRaiseLevel={gameState.currentRaiseLevel}
-              trumpCard={gameState.trumpCard}
-              trumpSuit={gameState.trumpSuit}
               deckRemainingCount={gameState.deckRemainingCount}
               onProposeRaise={handleProposeRaise}
               canRaise={gameState.phase === 'TURN_IN_PROGRESS'}

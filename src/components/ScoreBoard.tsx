@@ -1,19 +1,14 @@
 import React from 'react';
-import { Card, Suit } from '../types/game';
 import { ge } from '../i18n/ge';
 import { Flame, Layers } from 'lucide-react';
 
 interface ScoreBoardProps {
   team1MatchScore: number;
   team2MatchScore: number;
-  team1TrickPoints: number;
-  team2TrickPoints: number;
   team1TakenCardCount: number;
   team2TakenCardCount: number;
   targetMatchScore: number;
   currentRaiseLevel: number;
-  trumpCard: Card | null;
-  trumpSuit: Suit | null;
   deckRemainingCount: number;
   onProposeRaise?: (level: any) => void;
   canRaise?: boolean;
@@ -22,8 +17,6 @@ interface ScoreBoardProps {
 export const ScoreBoard: React.FC<ScoreBoardProps> = ({
   team1MatchScore,
   team2MatchScore,
-  team1TrickPoints,
-  team2TrickPoints,
   team1TakenCardCount,
   team2TakenCardCount,
   targetMatchScore,
@@ -41,6 +34,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
     6: ge.shashi,
   };
   const nextRaiseLevel = (currentRaiseLevel + 1) as any;
+  const takenCardCount = team1TakenCardCount + team2TakenCardCount;
 
   return (
     <div className="w-full bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-2xl p-3 shadow-xl text-slate-100 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -52,7 +46,6 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
           <div className="flex items-baseline gap-1.5">
             <span className="text-xl font-black text-amber-400">{team1MatchScore}</span>
           </div>
-          <span className="text-[10px] text-slate-400">{team1TrickPoints} ქულა • {team1TakenCardCount} კარტი</span>
         </div>
 
         <div className="text-slate-600 font-bold text-lg">:</div>
@@ -63,7 +56,6 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
           <div className="flex items-baseline gap-1.5">
             <span className="text-xl font-black text-amber-400">{team2MatchScore}</span>
           </div>
-          <span className="text-[10px] text-slate-400">{team2TrickPoints} ქულა • {team2TakenCardCount} კარტი</span>
         </div>
 
         <div className="h-8 w-px bg-slate-800" />
@@ -74,6 +66,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
             {ge.matchScore} <span className="font-bold text-amber-400">{targetMatchScore}</span>)
           </div>
           <div>რაუნდის ფასი <span className="font-bold text-amber-300">{levelNames[currentRaiseLevel] || currentRaiseLevel}</span></div>
+          <div>წაყვანილია <span className="font-bold text-emerald-300">{takenCardCount} კარტი</span></div>
         </div>
       </div>
 

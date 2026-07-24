@@ -4,6 +4,7 @@ import { CardSvg } from './CardSvg';
 import { soundEffects } from '../utils/audio';
 import { User, WifiOff, CheckCircle2 } from 'lucide-react';
 import { ge } from '../i18n/ge';
+import { calculateCardPoints } from '../game/engine';
 
 interface TableProps {
   state: GameState;
@@ -58,12 +59,6 @@ export const Table: React.FC<TableProps> = ({
     }
   };
 
-  const handlePlaySelected = () => {
-    if (selectedCardIds.length === 0) return;
-    onPlayCards(selectedCardIds);
-    setSelectedCardIds([]);
-  };
-
   const southPlayer = getPlayerByRelPos('south');
   const northPlayer = getPlayerByRelPos('north');
   const westPlayer = getPlayerByRelPos('west');
@@ -73,6 +68,23 @@ export const Table: React.FC<TableProps> = ({
     : null;
   const showTrickWinner =
     state.phase === 'TRICK_RESOLUTION' && state.currentTrickCards.length === state.settings.playerCount;
+  const currentTrickPoints = calculateCardPoints(state.currentTrickCards.flatMap((trick) => trick.cards));
+  const selectedCards = sortedHand.filter((card) => selectedCardIds.includes(card.id));
+  const selectedCardsAreSameSuit =
+    selectedCards.length > 0 && selectedCards.every((card) => card.suit === selectedCards[0].suit);
+  const expectedPlayCount = state.currentTrickCards.length === 0 ? selectedCards.length : state.requiredCardCount;
+  const canPlaySelection =
+    isMyTurn &&
+    state.phase === 'TURN_IN_PROGRESS' &&
+    selectedCards.length > 0 &&
+    (state.currentTrickCards.length > 0 || selectedCardsAreSameSuit) &&
+    selectedCards.length === expectedPlayCount;
+
+  const handlePlaySelected = () => {
+    if (!canPlaySelection) return;
+    onPlayCards(selectedCardIds);
+    setSelectedCardIds([]);
+  };
 
   const renderPlayerBadge = (player?: Player, relPos?: string) => {
     if (!player) {
@@ -86,9 +98,6 @@ export const Table: React.FC<TableProps> = ({
 
     const isCurrentTurn = state.currentTurnPosition === player.position;
     const isDealer = state.dealerPosition === player.position;
-    const takenCardCount = player.team === 1
-      ? state.team1TakenCardCount || 0
-      : state.team2TakenCardCount || 0;
 
     return (
       <div
@@ -120,9 +129,6 @@ export const Table: React.FC<TableProps> = ({
           </div>
           <span className="text-[9px] text-slate-400">
             გუნდი {player.team} • {player.cardsInHandCount} კარტი
-          </span>
-          <span className="text-[9px] text-emerald-300/80">
-            წაყვანილი {takenCardCount} კარტი
           </span>
         </div>
 
@@ -186,11 +192,11 @@ export const Table: React.FC<TableProps> = ({
             <div className="flex flex-col items-center gap-2">
               {showTrickWinner && (
                 <div className="bg-amber-400 text-slate-950 px-4 py-1.5 rounded-full text-xs font-black shadow-lg">
-                  ხელი წაიღო {trickWinner?.name || state.currentTempWinnerPosition}
+                  ხელი წაიღო {trickWinner?.name || state.currentTempWinnerPosition} • {currentTrickPoints} ქულა
                 </div>
               )}
 
-              <div className="relative flex items-center justify-center min-h-[126px] max-w-full px-8 py-3 bg-emerald-950/50 rounded-2xl border border-emerald-500/20 backdrop-blur-md overflow-visible">
+              <div className="relative h-[190px] w-[190px] sm:w-[220px] bg-emerald-950/50 rounded-2xl border border-emerald-500/20 backdrop-blur-md overflow-visible">
               {state.currentTrickCards.map((trick, idx) => {
                 const isWinner = state.currentTempWinnerPosition === trick.playerPosition;
                 const playerName = state.players.find((p) => p.id === trick.playerId)?.name || trick.playerPosition;
@@ -198,12 +204,12 @@ export const Table: React.FC<TableProps> = ({
                 return (
                   <div
                     key={idx}
-                    className={`relative flex flex-col items-center p-2 rounded-xl border transition-all first:ml-0 -ml-5 sm:-ml-7 ${
+                    className={`absolute left-1/2 top-2 flex flex-col items-center p-2 rounded-xl border transition-all ${
                       isWinner
                         ? 'bg-amber-500/20 border-amber-400 ring-2 ring-amber-400/50 shadow-lg'
                         : 'bg-slate-900/60 border-slate-800'
                     }`}
-                    style={{ zIndex: idx + 1, transform: `translateY(${idx * -6}px)` }}
+                    style={{ zIndex: idx + 1, transform: `translate(-50%, ${idx * 26}px)` }}
                   >
                     <span className="text-[10px] font-bold text-slate-300 mb-1">
                       {playerName}
@@ -248,9 +254,9 @@ export const Table: React.FC<TableProps> = ({
           <div className="flex items-center gap-2 mb-1 animate-bounce">
             <button
               onClick={handlePlaySelected}
-              disabled={selectedCardIds.length === 0}
+              disabled={!canPlaySelection}
               className={`font-black px-5 py-2 rounded-xl text-xs shadow-lg transition-all flex items-center gap-1.5 ${
-                selectedCardIds.length > 0
+                canPlaySelection
                   ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 scale-105 ring-2 ring-amber-200'
                   : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
               }`}

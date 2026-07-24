@@ -139,13 +139,13 @@ export class BuraRoom {
 
   addPlayer(uid: string, name: string): ActionResult {
     const state = this.state;
-    if (state.phase !== 'LOBBY') return { success: false, error: 'თამაში უკვე დაწყებულია' };
-
     const existing = state.players.find((p) => p.id === uid);
     if (existing) {
       existing.isConnected = true;
       return { success: true };
     }
+
+    if (state.phase !== 'LOBBY') return { success: false, error: 'თამაში უკვე დაწყებულია' };
 
     const maxPlayers = state.settings.playerCount;
     if (state.players.length >= maxPlayers) {
