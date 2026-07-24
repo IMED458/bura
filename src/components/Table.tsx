@@ -68,6 +68,11 @@ export const Table: React.FC<TableProps> = ({
   const northPlayer = getPlayerByRelPos('north');
   const westPlayer = getPlayerByRelPos('west');
   const eastPlayer = getPlayerByRelPos('east');
+  const trickWinner = state.currentTempWinnerPosition
+    ? state.players.find((p) => p.position === state.currentTempWinnerPosition)
+    : null;
+  const showTrickWinner =
+    state.phase === 'TRICK_RESOLUTION' && state.currentTrickCards.length === state.settings.playerCount;
 
   const renderPlayerBadge = (player?: Player, relPos?: string) => {
     if (!player) {
@@ -171,31 +176,45 @@ export const Table: React.FC<TableProps> = ({
               {isMyTurn ? ge.yourTurn : `${ge.waitingForTurn} ${state.players.find((p) => p.position === state.currentTurnPosition)?.name || ''}`}
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 p-2 bg-emerald-950/50 rounded-2xl border border-emerald-500/20 backdrop-blur-md">
+            <div className="flex flex-col items-center gap-2">
+              {showTrickWinner && (
+                <div className="bg-amber-400 text-slate-950 px-4 py-1.5 rounded-full text-xs font-black shadow-lg">
+                  ხელი წაიღო {trickWinner?.name || state.currentTempWinnerPosition}
+                </div>
+              )}
+
+              <div className="relative flex items-center justify-center min-h-[126px] max-w-full px-8 py-3 bg-emerald-950/50 rounded-2xl border border-emerald-500/20 backdrop-blur-md overflow-visible">
               {state.currentTrickCards.map((trick, idx) => {
-                const rel = getRelativePosition(trick.playerPosition);
                 const isWinner = state.currentTempWinnerPosition === trick.playerPosition;
+                const playerName = state.players.find((p) => p.id === trick.playerId)?.name || trick.playerPosition;
 
                 return (
                   <div
                     key={idx}
-                    className={`flex flex-col items-center p-2 rounded-xl border transition-all ${
+                    className={`relative flex flex-col items-center p-2 rounded-xl border transition-all first:ml-0 -ml-5 sm:-ml-7 ${
                       isWinner
-                        ? 'bg-amber-500/20 border-amber-400 ring-2 ring-amber-400/50 shadow-lg scale-105'
+                        ? 'bg-amber-500/20 border-amber-400 ring-2 ring-amber-400/50 shadow-lg'
                         : 'bg-slate-900/60 border-slate-800'
                     }`}
+                    style={{ zIndex: idx + 1, transform: `translateY(${idx * -6}px)` }}
                   >
                     <span className="text-[10px] font-bold text-slate-300 mb-1">
-                      {state.players.find((p) => p.id === trick.playerId)?.name || trick.playerPosition} ჩამოვიდა
+                      {playerName}
                     </span>
                     <div className="flex -space-x-2">
                       {trick.cards.map((card) => (
                         <CardSvg key={card.id} card={card} size="sm" isTrump={card.suit === state.trumpSuit} />
                       ))}
                     </div>
+                    {isWinner && (
+                      <span className="mt-1 text-[9px] font-black text-amber-300">
+                        იღებს
+                      </span>
+                    )}
                   </div>
                 );
               })}
+              </div>
             </div>
           )}
         </div>

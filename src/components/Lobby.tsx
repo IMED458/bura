@@ -50,7 +50,7 @@ export const Lobby: React.FC<LobbyProps> = ({
     e.preventDefault();
     if (!name.trim()) return;
     if (!joinCodeInput.trim()) return;
-    onJoinRoom(joinCodeInput.trim());
+    onJoinRoom(joinCodeInput);
   };
 
   return (
@@ -195,9 +195,9 @@ export const Lobby: React.FC<LobbyProps> = ({
               <input
                 type="text"
                 value={joinCodeInput}
-                onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
-                placeholder="BURA-1234"
-                maxLength={10}
+                onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
+                placeholder="A7K9Q2"
+                maxLength={6}
                 className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-amber-300 font-mono tracking-wider focus:outline-none focus:border-amber-500"
               />
               <button

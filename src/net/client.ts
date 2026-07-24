@@ -65,12 +65,15 @@ export class GameClient {
   private get db() { return this.ctx.db; }
 
   private async uniqueCode(): Promise<string> {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const makeCode = () => Array.from({ length: 6 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('');
+
     for (let i = 0; i < 10; i++) {
-      const code = 'BURA-' + Math.floor(1000 + Math.random() * 9000).toString();
+      const code = makeCode();
       const snap = await getDoc(doc(this.db, 'rooms', code));
       if (!snap.exists()) return code;
     }
-    return 'BURA-' + Date.now().toString().slice(-6);
+    return Date.now().toString(36).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(-6).padStart(6, '0');
   }
 
   async createRoom(name: string, settings: Partial<RoomSettings>, isPrivate = true): Promise<string> {
@@ -85,7 +88,7 @@ export class GameClient {
 
   async joinRoom(code: string, name: string, autoReady = false): Promise<void> {
     await this.init();
-    const clean = code.toUpperCase().trim();
+    const clean = code.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
     const snap = await getDoc(doc(this.db, 'rooms', clean));
     if (!snap.exists()) {
       this.cb.onError('ოთახი კოდით ' + clean + ' ვერ მოიძებნა');

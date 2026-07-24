@@ -6,7 +6,7 @@ export const ge = {
   createRoom: 'თამაშის შექმნა',
   joinRoom: 'ოთახში კოდით შესვლა',
   findMatch: 'შემთხვევითი მოთამაშეების მოძებნა',
-  roomCodePlaceholder: 'შეიყვანეთ კოდი (მაგ: BURA-1234)',
+  roomCodePlaceholder: 'შეიყვანეთ კოდი (მაგ: A7K9Q2)',
   howToPlay: 'როგორ ვითამაშოთ (წესები)',
   soundOn: 'ხმა ჩართულია',
   soundOff: 'ხმა გამორთულია',
