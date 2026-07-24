@@ -87,10 +87,33 @@ function testRejections() {
   assert(!early.success, 'უარყოფა: არ-მზა თამაში ვერ დაიწყო');
 }
 
+function testTurnTimeoutAutoPlay() {
+  const room = BuraRoom.createNew('a', 'A', 'BURA-TIMER', true, { playerCount: 2 });
+  room.addPlayer('b', 'B');
+  room.setReady('b', true);
+  room.startGame('a');
+
+  const turnPlayer = room.state.players.find((p) => p.position === room.state.currentTurnPosition)!;
+  const handBefore = turnPlayer.cardsInHandCount;
+  const startedAt = room.state.turnStartedAt || Date.now();
+
+  assert(room.tickTimers(startedAt + 15_000), 'ტაიმერი: 15 წამზე გაფრთხილება ჩაირთო');
+  assert(!!room.state.turnWarningSent, 'ტაიმერი: გაფრთხილება state-ში ჩაიწერა');
+  assert(room.tickTimers(startedAt + 30_000), 'ტაიმერი: 30 წამზე მოთამაშე დროებით გავიდა');
+  assert(!turnPlayer.isConnected, 'ტაიმერი: მოთამაშე disconnected გახდა');
+
+  assert(room.tickTimers((room.state.autoPlayDeadline || startedAt + 50_000)), 'ტაიმერი: disconnected მოთამაშემ ავტომატურად ჩამოვიდა');
+  assert(turnPlayer.cardsInHandCount === handBefore - 1, 'ტაიმერი: ავტომატურმა სვლამ 1 კარტი დადო');
+
+  const reconnect = room.addPlayer(turnPlayer.id, turnPlayer.name);
+  assert(reconnect.success && !!turnPlayer.isConnected, 'ტაიმერი: დაბრუნებულმა მოთამაშემ იგივე თამაშში განაგრძო');
+}
+
 console.log('=== BURA ROOM UNIT TESTS ===');
 playFullGame(2);
 playFullGame(4);
 testBuraDeclare();
 testRejections();
+testTurnTimeoutAutoPlay();
 console.log(`\n=== SUMMARY: ${pass} Passed, ${fail} Failed ===`);
 process.exit(fail > 0 ? 1 : 0);

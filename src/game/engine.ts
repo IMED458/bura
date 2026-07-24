@@ -238,6 +238,10 @@ export function initializeRound(
     pendingRaise: null,
     winningTeam: null,
     turnDeadline: Date.now() + (state.settings.turnTimeSeconds || 30) * 1000,
+    turnStartedAt: Date.now(),
+    turnWarningAt: Date.now() + 15_000,
+    turnWarningSent: false,
+    autoPlayDeadline: null,
   };
 
   // `shuffled` now holds the remaining draw pile (trump card sits at the

@@ -103,6 +103,10 @@ export interface GameState {
   
   // Turn Timer
   turnDeadline: number | null; // Timestamp ms
+  turnStartedAt?: number | null;
+  turnWarningAt?: number | null;
+  turnWarningSent?: boolean;
+  autoPlayDeadline?: number | null;
   
   // Reconnect state
   pausedUntil?: number | null;

@@ -18,6 +18,8 @@ import {
   RoomSettings,
 } from '../types/game';
 import {
+  RANK_POINTS,
+  RANK_STRENGTH,
   calculateCardPoints,
   canBeatAllCards,
   createDeck,
@@ -32,6 +34,10 @@ import { createSystemMessage } from './chat';
 
 type NewChat = Omit<ChatMessage, 'id'>;
 export type ActionResult = { success: boolean; error?: string };
+
+const WARNING_AFTER_MS = 15_000;
+const DISCONNECT_AFTER_MS = 30_000;
+const AUTO_PLAY_AFTER_DISCONNECT_MS = 20_000;
 
 export const DEFAULT_SETTINGS: RoomSettings = {
   playerCount: 4,
@@ -103,6 +109,10 @@ export class BuraRoom {
       roundNumber: 1,
       winningTeam: null,
       turnDeadline: null,
+      turnStartedAt: null,
+      turnWarningAt: null,
+      turnWarningSent: false,
+      autoPlayDeadline: null,
     };
 
     const room = new BuraRoom(state);
@@ -142,6 +152,10 @@ export class BuraRoom {
     const existing = state.players.find((p) => p.id === uid);
     if (existing) {
       existing.isConnected = true;
+      existing.disconnectedAt = undefined;
+      if (state.phase === 'TURN_IN_PROGRESS' && existing.position === state.currentTurnPosition) {
+        this.startTurnTimer();
+      }
       return { success: true };
     }
 
@@ -188,6 +202,12 @@ export class BuraRoom {
       }
     } else {
       player.isConnected = false;
+      player.disconnectedAt = Date.now();
+      this.say(`${player.name} კავშირიდან გავიდა. თუ მისი სვლაა, 20 წამში კარტი ავტომატურად დაიდება.`, 'leave');
+      if (player.position === state.currentTurnPosition) {
+        state.autoPlayDeadline = player.disconnectedAt + AUTO_PLAY_AFTER_DISCONNECT_MS;
+        state.turnDeadline = state.autoPlayDeadline;
+      }
     }
     return { success: true };
   }
@@ -216,6 +236,7 @@ export class BuraRoom {
     this.state = newState;
     this.hands = cardsByPlayer;
     this.deck = deck;
+    this.startTurnTimer();
     this.say('თამაში დაიწყო! კოზირია: ' + newState.trumpSuit, 'join');
     return { success: true };
   }
@@ -232,6 +253,7 @@ export class BuraRoom {
     this.state = newState;
     this.hands = cardsByPlayer;
     this.deck = deck;
+    this.startTurnTimer();
     this.say(`რაუნდი ${newState.roundNumber} დაიწყო! კოზირია: ` + newState.trumpSuit, 'join');
     return { success: true };
   }
@@ -250,11 +272,132 @@ export class BuraRoom {
     this.state = newState;
     this.hands = cardsByPlayer;
     this.deck = deck;
+    this.startTurnTimer();
     this.say('ახალი მატჩი დაიწყო! კოზირია: ' + newState.trumpSuit, 'join');
     return { success: true };
   }
 
   // ---- gameplay ------------------------------------------------------------
+
+  private startTurnTimer(now = Date.now()) {
+    const state = this.state;
+    const player = state.players.find((p) => p.position === state.currentTurnPosition);
+    state.turnStartedAt = now;
+    state.turnWarningAt = now + WARNING_AFTER_MS;
+    state.turnWarningSent = false;
+    if (player && !player.isConnected) {
+      const disconnectedAt = player.disconnectedAt || now;
+      player.disconnectedAt = disconnectedAt;
+      state.autoPlayDeadline = disconnectedAt + AUTO_PLAY_AFTER_DISCONNECT_MS;
+      state.turnDeadline = state.autoPlayDeadline;
+    } else {
+      state.autoPlayDeadline = null;
+      state.turnDeadline = now + DISCONNECT_AFTER_MS;
+    }
+  }
+
+  private sortCardsForAuto(cards: Card[]): Card[] {
+    return [...cards].sort((a, b) => {
+      const points = RANK_POINTS[a.rank] - RANK_POINTS[b.rank];
+      if (points !== 0) return points;
+      return RANK_STRENGTH[a.rank] - RANK_STRENGTH[b.rank];
+    });
+  }
+
+  private combinations(cards: Card[], count: number): Card[][] {
+    if (count <= 0) return [];
+    if (count === 1) return cards.map((card) => [card]);
+    const out: Card[][] = [];
+    const walk = (start: number, picked: Card[]) => {
+      if (picked.length === count) {
+        out.push(picked);
+        return;
+      }
+      for (let i = start; i < cards.length; i++) {
+        walk(i + 1, [...picked, cards[i]]);
+      }
+    };
+    walk(0, []);
+    return out;
+  }
+
+  private comboValue(cards: Card[]): number {
+    return cards.reduce((sum, card) => sum + RANK_POINTS[card.rank] * 10 + RANK_STRENGTH[card.rank], 0);
+  }
+
+  private chooseAutoCards(uid: string): Card[] {
+    const state = this.state;
+    const hand = this.sortCardsForAuto(this.hands.get(uid) || []);
+    if (hand.length === 0) return [];
+
+    if (state.currentTrickCards.length === 0) {
+      const bySuit = new Map<string, Card[]>();
+      for (const card of hand) bySuit.set(card.suit, [...(bySuit.get(card.suit) || []), card]);
+      const groups = [...bySuit.values()].sort((a, b) => b.length - a.length || this.comboValue(a.slice(0, 1)) - this.comboValue(b.slice(0, 1)));
+      return groups[0]?.slice(0, 1) || [hand[0]];
+    }
+
+    const count = Math.min(state.requiredCardCount || 1, hand.length);
+    const combos = this.combinations(hand, count).sort((a, b) => this.comboValue(a) - this.comboValue(b));
+    const leaderTrick = state.currentTrickCards.find((t) => t.playerPosition === state.currentTempWinnerPosition);
+    if (leaderTrick && state.trumpSuit) {
+      const winning = combos.find((combo) => canBeatAllCards(combo, leaderTrick.cards, state.trumpSuit!));
+      if (winning) return winning;
+    }
+    return combos[0] || hand.slice(0, count);
+  }
+
+  autoPlayCurrentTurn(reason: 'timeout' | 'disconnected' = 'timeout'): ActionResult {
+    const state = this.state;
+    if (state.phase !== 'TURN_IN_PROGRESS') return { success: false, error: 'ახლა სვლის ფაზა არ არის' };
+    const player = state.players.find((p) => p.position === state.currentTurnPosition);
+    if (!player) return { success: false, error: 'მოთამაშე ვერ მოიძებნა' };
+    const cards = this.chooseAutoCards(player.id);
+    if (cards.length === 0) return { success: false, error: 'ავტომატურად დასადები კარტი არ არის' };
+    const res = this.playCards(player.id, cards.map((card) => card.id));
+    if (res.success) {
+      this.say(`${player.name}-ის მაგივრად ავტომატურად დაიდო ${cards.length} კარტი (${reason === 'disconnected' ? 'კავშირი გაწყვეტილია' : 'დრო ამოიწურა'})`, 'trick_win');
+    }
+    return res;
+  }
+
+  tickTimers(now = Date.now()): boolean {
+    const state = this.state;
+    if (state.phase !== 'TURN_IN_PROGRESS') return false;
+
+    const player = state.players.find((p) => p.position === state.currentTurnPosition);
+    if (!player) return false;
+
+    if (!player.isConnected) {
+      if (!state.autoPlayDeadline) {
+        state.autoPlayDeadline = (player.disconnectedAt || now) + AUTO_PLAY_AFTER_DISCONNECT_MS;
+        state.turnDeadline = state.autoPlayDeadline;
+        return true;
+      }
+      if (now >= state.autoPlayDeadline) {
+        this.autoPlayCurrentTurn('disconnected');
+        return true;
+      }
+      return false;
+    }
+
+    if (!state.turnWarningSent && state.turnWarningAt && now >= state.turnWarningAt) {
+      state.turnWarningSent = true;
+      this.say(`${player.name}, 15 წამი დაგრჩათ სვლისთვის`, 'join');
+      return true;
+    }
+
+    if (state.turnDeadline && now >= state.turnDeadline) {
+      player.isConnected = false;
+      player.disconnectedAt = now;
+      state.autoPlayDeadline = now + AUTO_PLAY_AFTER_DISCONNECT_MS;
+      state.turnDeadline = state.autoPlayDeadline;
+      this.say(`${player.name} დროის ამოწურვის გამო დროებით გავიდა თამაშიდან. 20 წამში კარტი ავტომატურად დაიდება.`, 'leave');
+      return true;
+    }
+
+    return false;
+  }
 
   playCards(uid: string, cardIds: string[]): ActionResult {
     const state = this.state;
@@ -306,7 +449,7 @@ export class BuraRoom {
       state.turnDeadline = null;
     } else {
       state.currentTurnPosition = getNextPosition(state.currentTurnPosition, state.settings.playerCount);
-      state.turnDeadline = Date.now() + (state.settings.turnTimeSeconds || 30) * 1000;
+      this.startTurnTimer();
     }
     return { success: true };
   }
@@ -347,7 +490,7 @@ export class BuraRoom {
       this.resolveRound();
     } else {
       state.phase = 'TURN_IN_PROGRESS';
-      state.turnDeadline = Date.now() + (state.settings.turnTimeSeconds || 30) * 1000;
+      this.startTurnTimer();
     }
   }
 
@@ -437,6 +580,7 @@ export class BuraRoom {
       state.currentRaiseLevel = state.pendingRaise.level;
       state.pendingRaise = null;
       state.phase = 'TURN_IN_PROGRESS';
+      this.startTurnTimer();
       this.say('შეთავაზება მიღებულია! რაუნდის ფასია ' + state.currentRaiseLevel, 'davi');
     } else {
       const winningTeam = state.pendingRaise.proposedByTeam;

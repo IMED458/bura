@@ -65,6 +65,7 @@ export const Table: React.FC<TableProps> = ({
   const trickWinner = state.currentTempWinnerPosition
     ? state.players.find((p) => p.position === state.currentTempWinnerPosition)
     : null;
+  const currentTurnPlayer = state.players.find((p) => p.position === state.currentTurnPosition);
   const showTrickWinner =
     state.phase === 'TRICK_RESOLUTION' && state.currentTrickCards.length === state.settings.playerCount;
   const currentTrickCardCount = state.currentTrickCards.reduce((sum, trick) => sum + trick.cards.length, 0);
@@ -184,8 +185,20 @@ export const Table: React.FC<TableProps> = ({
         {/* CENTER TRICK PLAY AREA */}
         <div className="flex-1 flex flex-col items-center justify-center min-h-[160px] relative">
           {state.currentTrickCards.length === 0 ? (
-            <div className="text-center text-xs text-emerald-300/60 italic bg-emerald-950/40 px-4 py-2 rounded-full border border-emerald-500/10 backdrop-blur-sm">
-              {isMyTurn ? ge.yourTurn : `${ge.waitingForTurn} ${state.players.find((p) => p.position === state.currentTurnPosition)?.name || ''}`}
+            <div className="flex flex-col items-center gap-2">
+              {state.turnWarningSent && (
+                <div className="bg-red-600 text-white px-4 py-1.5 rounded-full text-xs font-black shadow-lg">
+                  გაფრთხილება: {currentTurnPlayer?.name || 'მოთამაშე'} უნდა ჩამოვიდეს
+                </div>
+              )}
+              {!currentTurnPlayer?.isConnected && (
+                <div className="bg-amber-400 text-slate-950 px-4 py-1.5 rounded-full text-xs font-black shadow-lg">
+                  კავშირი გაწყვეტილია, ავტომატური სვლა მზადდება
+                </div>
+              )}
+              <div className="text-center text-xs text-emerald-300/60 italic bg-emerald-950/40 px-4 py-2 rounded-full border border-emerald-500/10 backdrop-blur-sm">
+                {isMyTurn ? ge.yourTurn : `${ge.waitingForTurn} ${currentTurnPlayer?.name || ''}`}
+              </div>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2">

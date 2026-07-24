@@ -38,6 +38,7 @@ export class HostEngine {
   private db: Firestore;
   private actionsUnsub: Unsubscribe | null = null;
   private chain: Promise<void> = Promise.resolve();
+  private timerId: ReturnType<typeof setInterval> | null = null;
 
   constructor(code: string, room: BuraRoom, db: Firestore) {
     this.code = code;
@@ -67,9 +68,17 @@ export class HostEngine {
   stop() {
     if (this.actionsUnsub) this.actionsUnsub();
     this.actionsUnsub = null;
+    if (this.timerId) clearInterval(this.timerId);
+    this.timerId = null;
   }
 
   private listen() {
+    if (!this.timerId) {
+      this.timerId = setInterval(() => {
+        this.chain = this.chain.then(() => this.handleTimers()).catch((e) => console.error('timer error', e));
+      }, 1000);
+    }
+
     const q = query(this.actionsCol(), orderBy('ts', 'asc'));
     this.actionsUnsub = onSnapshot(q, (snap) => {
       snap.docChanges().forEach((change) => {
@@ -80,6 +89,18 @@ export class HostEngine {
         this.chain = this.chain.then(() => this.handle(id, data)).catch((e) => console.error('action error', e));
       });
     });
+  }
+
+  private async handleTimers() {
+    const changed = this.room.tickTimers();
+    if (!changed) return;
+
+    await this.persistAll();
+    if (this.room.state.phase === 'TRICK_RESOLUTION') {
+      await wait(TRICK_REVEAL_DELAY_MS);
+      this.room.resolvePendingTrick();
+      await this.persistAll();
+    }
   }
 
   private async handle(actionId: string, action: ActionDoc) {
