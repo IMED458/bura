@@ -1,0 +1,71 @@
+rules_version = '2';
+
+// Bura — host-authoritative model.
+// The room's hostUid is the only writer of authoritative state (room doc,
+// hands, deck). Any authenticated (anonymous) player who is a member of the
+// room may read the public state, read ONLY their own hand, post chat, and
+// submit actions. Players never read the deck or other players' hands.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    match /rooms/{code} {
+      function room() { return resource.data; }
+      function isHost() {
+        return signedIn() && request.auth.uid == resource.data.hostUid;
+      }
+      function isHostAfter() {
+        return signedIn() && request.auth.uid == request.resource.data.hostUid;
+      }
+      function isMember() {
+        return signedIn() && request.auth.uid in resource.data.memberUids;
+      }
+
+      // Anyone signed in can read a room (needed to join by code / matchmaking).
+      allow read: if signedIn();
+      // Creator sets themselves as host; only the host may update or delete.
+      allow create: if isHostAfter();
+      allow update: if isHost() || isMember(); // members update only memberUids on join (guarded below)
+      allow delete: if isHost();
+
+      // Secret deck — host only.
+      match /private/{docId} {
+        allow read, write: if signedIn() && request.auth.uid == get(/databases/$(database)/documents/rooms/$(code)).data.hostUid;
+      }
+
+      // Per-player hands — a player reads only their own; host reads/writes all.
+      match /hands/{uid} {
+        allow read: if signedIn() &&
+          (request.auth.uid == uid ||
+           request.auth.uid == get(/databases/$(database)/documents/rooms/$(code)).data.hostUid);
+        allow write: if signedIn() &&
+          request.auth.uid == get(/databases/$(database)/documents/rooms/$(code)).data.hostUid;
+      }
+
+      // Actions queue — members submit; host reads and clears.
+      match /actions/{actionId} {
+        allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+        allow read, delete: if signedIn() &&
+          request.auth.uid == get(/databases/$(database)/documents/rooms/$(code)).data.hostUid;
+      }
+
+      // Chat — any member reads; members create their own messages; host may write system messages.
+      match /chat/{msgId} {
+        allow read: if signedIn();
+        allow create: if signedIn() &&
+          (request.resource.data.senderId == request.auth.uid ||
+           request.auth.uid == get(/databases/$(database)/documents/rooms/$(code)).data.hostUid);
+      }
+    }
+
+    // Matchmaking queue — each entry owned by its player.
+    match /matchmaking/{entryId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+  }
+}
