@@ -4,7 +4,6 @@ import { CardSvg } from './CardSvg';
 import { soundEffects } from '../utils/audio';
 import { User, WifiOff, CheckCircle2 } from 'lucide-react';
 import { ge } from '../i18n/ge';
-import { calculateCardPoints } from '../game/engine';
 
 interface TableProps {
   state: GameState;
@@ -68,7 +67,7 @@ export const Table: React.FC<TableProps> = ({
     : null;
   const showTrickWinner =
     state.phase === 'TRICK_RESOLUTION' && state.currentTrickCards.length === state.settings.playerCount;
-  const currentTrickPoints = calculateCardPoints(state.currentTrickCards.flatMap((trick) => trick.cards));
+  const currentTrickCardCount = state.currentTrickCards.reduce((sum, trick) => sum + trick.cards.length, 0);
   const selectedCards = sortedHand.filter((card) => selectedCardIds.includes(card.id));
   const selectedCardsAreSameSuit =
     selectedCards.length > 0 && selectedCards.every((card) => card.suit === selectedCards[0].suit);
@@ -192,7 +191,7 @@ export const Table: React.FC<TableProps> = ({
             <div className="flex flex-col items-center gap-2">
               {showTrickWinner && (
                 <div className="bg-amber-400 text-slate-950 px-4 py-1.5 rounded-full text-xs font-black shadow-lg">
-                  ხელი წაიღო {trickWinner?.name || state.currentTempWinnerPosition} • {currentTrickPoints} ქულა
+                  ხელი წაიღო {trickWinner?.name || state.currentTempWinnerPosition} • {currentTrickCardCount} კარტი
                 </div>
               )}
 
