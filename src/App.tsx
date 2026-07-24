@@ -271,6 +271,7 @@ export default function App() {
               targetMatchScore={gameState.settings.targetMatchScore}
               currentRaiseLevel={gameState.currentRaiseLevel}
               deckRemainingCount={gameState.deckRemainingCount}
+              players={gameState.players}
               onProposeRaise={handleProposeRaise}
               canRaise={gameState.phase === 'TURN_IN_PROGRESS'}
             />

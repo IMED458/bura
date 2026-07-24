@@ -1,4 +1,5 @@
 import React from 'react';
+import { Player } from '../types/game';
 import { ge } from '../i18n/ge';
 import { Flame, Layers } from 'lucide-react';
 
@@ -10,6 +11,7 @@ interface ScoreBoardProps {
   targetMatchScore: number;
   currentRaiseLevel: number;
   deckRemainingCount: number;
+  players: Player[];
   onProposeRaise?: (level: any) => void;
   canRaise?: boolean;
 }
@@ -22,6 +24,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
   targetMatchScore,
   currentRaiseLevel,
   deckRemainingCount,
+  players,
   onProposeRaise,
   canRaise = false,
 }) => {
@@ -35,6 +38,11 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
   };
   const nextRaiseLevel = (currentRaiseLevel + 1) as any;
   const takenCardCount = team1TakenCardCount + team2TakenCardCount;
+  const teamNames = (team: 1 | 2) =>
+    players
+      .filter((player) => player.team === team)
+      .map((player) => player.name)
+      .join(' / ') || 'მოთამაშე';
 
   return (
     <div className="w-full bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-2xl p-3 shadow-xl text-slate-100 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -46,6 +54,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
           <div className="flex items-baseline gap-1.5">
             <span className="text-xl font-black text-amber-400">{team1MatchScore}</span>
           </div>
+          <span className="max-w-[120px] truncate text-[10px] text-slate-400">{teamNames(1)}</span>
         </div>
 
         <div className="text-slate-600 font-bold text-lg">:</div>
@@ -56,6 +65,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
           <div className="flex items-baseline gap-1.5">
             <span className="text-xl font-black text-amber-400">{team2MatchScore}</span>
           </div>
+          <span className="max-w-[120px] truncate text-[10px] text-slate-400">{teamNames(2)}</span>
         </div>
 
         <div className="h-8 w-px bg-slate-800" />
