@@ -180,10 +180,10 @@ export default function App() {
           {gameState && (
             <button
               onClick={handleLeaveRoom}
-              className="p-2 bg-red-950/70 hover:bg-red-900 text-red-200 rounded-xl border border-red-800 text-xs font-bold transition-colors flex items-center gap-1.5"
+              className="px-3 py-2 bg-red-950/70 hover:bg-red-900 text-red-200 rounded-xl border border-red-800 text-xs font-bold transition-colors flex items-center gap-1.5"
             >
               <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">გასვლა</span>
+              <span>{isGameActive ? 'თამაშიდან გასვლა' : 'ოთახიდან გასვლა'}</span>
             </button>
           )}
 
@@ -236,6 +236,16 @@ export default function App() {
           />
         ) : (
           <div className="flex flex-col gap-4">
+            <div className="flex justify-end">
+              <button
+                onClick={handleLeaveRoom}
+                className="bg-red-950/80 hover:bg-red-900 text-red-100 border border-red-800 font-bold px-4 py-2.5 rounded-xl text-xs transition-colors flex items-center gap-2 shadow-lg"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>თამაშიდან გასვლა</span>
+              </button>
+            </div>
+
             <Table
               state={gameState}
               hand={hand}
