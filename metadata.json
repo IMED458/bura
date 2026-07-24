@@ -1,6 +1,6 @@
 {
-  "name": "5-კარტიანი ბურა",
-  "description": "ქართული კარტის თამაში 5-კარტიანი ბურა 4 მოთამაშისთვის რეალურ დროში (2v2 გუნდები, კერძო ოთახები, matchmaking, ჩატი).",
+  "name": "ბურა",
+  "description": "ქართული კარტის თამაში ბურა — 2 (1v1) ან 4 (2v2) მოთამაშისთვის რეალურ დროში (კერძო ოთახები, matchmaking, ჩატი).",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

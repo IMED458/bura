@@ -1,5 +1,5 @@
 export const ge = {
-  appName: '5-კარტიანი ბურა',
+  appName: 'ბურა',
   tagline: 'ონლაინ ქართული კარტის თამაში (2 მოთამაშე 1v1 ან 4 მოთამაშე 2v2)',
   enterName: 'შეიყვანეთ თქვენი სახელი',
   namePlaceholder: 'მაგ: გიორგი',

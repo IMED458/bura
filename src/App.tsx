@@ -281,6 +281,10 @@ export default function App() {
           unreadCount={unreadCount}
         />
       </main>
+
+      <footer className="border-t border-slate-800/80 bg-slate-900/40 py-3 text-center text-xs text-slate-500">
+        made by <span className="font-bold text-amber-400">IMED</span>🩺
+      </footer>
     </div>
   );
 }

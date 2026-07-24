@@ -3,9 +3,9 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import { defineConfig } from 'vite';
 
-// GitHub Pages serves this project page under /bura/. Local dev stays at /.
-export default defineConfig(({ command }) => ({
-  base: command === 'build' ? '/bura/' : '/',
+// Served from the custom domain bura.imed.com.ge at the root path.
+export default defineConfig(() => ({
+  base: '/',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
