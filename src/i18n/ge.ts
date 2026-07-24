@@ -1,6 +1,6 @@
 export const ge = {
   appName: '5-კარტიანი ბურა',
-  tagline: 'ონლაინ ქართული კარტის თამაში (4 მოთამაშე / 2v2 გუნდები)',
+  tagline: 'ონლაინ ქართული კარტის თამაში (2 მოთამაშე 1v1 ან 4 მოთამაშე 2v2)',
   enterName: 'შეიყვანეთ თქვენი სახელი',
   namePlaceholder: 'მაგ: გიორგი',
   createRoom: 'თამაშის შექმნა',
@@ -10,6 +10,13 @@ export const ge = {
   howToPlay: 'როგორ ვითამაშოთ (წესები)',
   soundOn: 'ხმა ჩართულია',
   soundOff: 'ხმა გამორთულია',
+
+  // Game mode
+  selectMode: 'აირჩიეთ თამაშის რეჟიმი',
+  mode2p: '2 მოთამაშე',
+  mode2pDesc: '1 vs 1',
+  mode4p: '4 მოთამაშე',
+  mode4pDesc: '2 vs 2 გუნდები',
   
   // Lobby / Room
   roomTitle: 'თამაშის ოთახი',
@@ -20,7 +27,8 @@ export const ge = {
   copyCode: 'კოდის კოპირება',
   codeCopied: 'კოდი დაკოპირდა!',
   leaveRoom: 'ოთახიდან გასვლა',
-  waitingForPlayers: 'ველოდებით მოთამაშეებს (4/4)...',
+  waitingForPlayers: 'ველოდებით მოთამაშეებს',
+  opponent: 'მოწინააღმდეგე',
   team1: 'გუნდი 1 (სამხრეთი - ჩრდილოეთი)',
   team2: 'გუნდი 2 (დასავლეთი - აღმოსავლეთი)',
   host: 'ჰოსტი',

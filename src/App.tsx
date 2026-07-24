@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, ChatMessage, GameState, Player, PlayerPosition, ClientMessage, ServerMessage } from './types/game';
+import { Card, ChatMessage, GameState, Player, PlayerPosition, PlayerCount, ClientMessage, ServerMessage } from './types/game';
 import { Lobby } from './components/Lobby';
 import { RoomLobby } from './components/RoomLobby';
 import { Table } from './components/Table';
@@ -29,6 +29,9 @@ export default function App() {
 
   const [inMatchmaking, setInMatchmaking] = useState(false);
   const [matchmakingCount, setMatchmakingCount] = useState(0);
+  const [mode, setMode] = useState<PlayerCount>(
+    () => (localStorage.getItem('bura_mode') === '4' ? 4 : 2)
+  );
 
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isHowToPlayOpen, setIsHowToPlayOpen] = useState(false);
@@ -120,9 +123,14 @@ export default function App() {
     }
   };
 
+  const selectMode = (m: PlayerCount) => {
+    setMode(m);
+    localStorage.setItem('bura_mode', String(m));
+  };
+
   const handleCreateRoom = () => {
     if (!name.trim()) return;
-    sendMsg({ type: 'CREATE_ROOM', name: name.trim() });
+    sendMsg({ type: 'CREATE_ROOM', name: name.trim(), settings: { playerCount: mode } });
   };
 
   const handleJoinRoom = (code: string) => {
@@ -141,6 +149,7 @@ export default function App() {
       type: 'JOIN_MATCHMAKING',
       name: name.trim(),
       sessionToken,
+      mode,
     });
   };
 
@@ -269,6 +278,8 @@ export default function App() {
             onCancelMatchmaking={handleCancelMatchmaking}
             inMatchmaking={inMatchmaking}
             matchmakingCount={matchmakingCount}
+            mode={mode}
+            onSelectMode={selectMode}
             onOpenHowToPlay={() => setIsHowToPlayOpen(true)}
             soundEnabled={soundEnabled}
             setSoundEnabled={setSoundEnabled}

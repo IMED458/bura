@@ -135,7 +135,7 @@ async function startServer() {
           }
 
           case 'JOIN_MATCHMAKING': {
-            const res = roomManager.handleMatchmaking(ws.playerId, msg.name, msg.sessionToken);
+            const res = roomManager.handleMatchmaking(ws.playerId, msg.name, msg.sessionToken, msg.mode);
             sendMsg(ws, {
               type: 'MATCHMAKING_STATUS',
               inQueue: res.inQueue,

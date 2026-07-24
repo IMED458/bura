@@ -29,14 +29,22 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const seats = [
-    { pos: 'south', name: ge.south, team: 1 },
-    { pos: 'west', name: ge.west, team: 2 },
-    { pos: 'north', name: ge.north, team: 1 },
-    { pos: 'east', name: ge.east, team: 2 },
-  ];
+  const playerCount = state.settings.playerCount;
 
-  const allReady = state.players.length === 4 && state.players.every((p) => p.isReady || p.isHost);
+  const seats = playerCount === 2
+    ? [
+        { pos: 'south', name: ge.south, team: 1 },
+        { pos: 'north', name: ge.opponent, team: 2 },
+      ]
+    : [
+        { pos: 'south', name: ge.south, team: 1 },
+        { pos: 'west', name: ge.west, team: 2 },
+        { pos: 'north', name: ge.north, team: 1 },
+        { pos: 'east', name: ge.east, team: 2 },
+      ];
+
+  const allReady =
+    state.players.length === playerCount && state.players.every((p) => p.isReady || p.isHost);
 
   return (
     <div className="max-w-2xl mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-slate-100 flex flex-col gap-6">
@@ -47,7 +55,9 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
             <Users className="w-5 h-5" />
             <span>{ge.roomTitle}</span>
           </h2>
-          <p className="text-xs text-slate-400">{ge.waitingForPlayers}</p>
+          <p className="text-xs text-slate-400">
+            {ge.waitingForPlayers} ({state.players.length}/{playerCount})
+          </p>
         </div>
 
         {/* Room Code Badge */}

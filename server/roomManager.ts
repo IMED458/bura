@@ -15,6 +15,7 @@ import {
   canBeatAllCards,
   createDeck,
   getNextPosition,
+  getSeatOrder,
   getTeamForPosition,
   initializeRound,
   isBuraHand,
@@ -37,6 +38,7 @@ export interface MatchmakingEntry {
   sessionToken: string;
   name: string;
   timestamp: number;
+  mode: 2 | 4;
 }
 
 export class RoomManager {
@@ -67,6 +69,7 @@ export class RoomManager {
     const sessionToken = crypto.randomUUID();
 
     const defaultSettings: RoomSettings = {
+      playerCount: 4,
       turnTimeSeconds: 30,
       targetMatchScore: 11,
       drawRule6060: 'redeal',
@@ -74,13 +77,15 @@ export class RoomManager {
       daviWhoCanRaise: 'turn_player',
       ...customSettings,
     };
+    // Guard against invalid values coming from the client.
+    defaultSettings.playerCount = defaultSettings.playerCount === 2 ? 2 : 4;
 
     const hostPlayer: Player = {
       id: hostSocketId,
       sessionToken,
       name: hostName,
       position: 'south',
-      team: 1,
+      team: getTeamForPosition('south', defaultSettings.playerCount),
       isHost: true,
       isReady: true,
       isConnected: true,
@@ -158,8 +163,9 @@ export class RoomManager {
       }
     }
 
-    if (state.players.length >= 4) {
-      return { success: false, sessionToken: '', error: 'ოთახი უკვე სავსეა (4 მოთამაშე)' };
+    const maxPlayers = state.settings.playerCount;
+    if (state.players.length >= maxPlayers) {
+      return { success: false, sessionToken: '', error: `ოთახი უკვე სავსეა (${maxPlayers} მოთამაშე)` };
     }
 
     // Name collision check
@@ -167,9 +173,10 @@ export class RoomManager {
       return { success: false, sessionToken: '', error: 'ამ სახელით მოთამაშე უკვე ოთახშია' };
     }
 
-    // Find first available seat
+    // Find first available seat within the active seats for this mode
+    const seatOrder = getSeatOrder(maxPlayers);
     const occupiedPositions = new Set(state.players.map((p) => p.position));
-    const availablePos = POSITION_ORDER.find((pos) => !occupiedPositions.has(pos)) || 'west';
+    const availablePos = seatOrder.find((pos) => !occupiedPositions.has(pos)) || seatOrder[seatOrder.length - 1];
 
     const newToken = crypto.randomUUID();
     const newPlayer: Player = {
@@ -177,7 +184,7 @@ export class RoomManager {
       sessionToken: newToken,
       name,
       position: availablePos,
-      team: getTeamForPosition(availablePos),
+      team: getTeamForPosition(availablePos, maxPlayers),
       isHost: false,
       isReady: false,
       isConnected: true,
@@ -197,8 +204,11 @@ export class RoomManager {
   public handleMatchmaking(
     socketId: string,
     name: string,
-    sessionToken?: string
+    sessionToken?: string,
+    mode: 2 | 4 = 4
   ): { inQueue: boolean; playersFound: number } {
+    const targetSize: 2 | 4 = mode === 2 ? 2 : 4;
+
     // Remove if already in queue
     this.matchmakingQueue = this.matchmakingQueue.filter((m) => m.socketId !== socketId);
 
@@ -208,14 +218,22 @@ export class RoomManager {
       sessionToken: newToken,
       name,
       timestamp: Date.now(),
+      mode: targetSize,
     });
 
-    if (this.matchmakingQueue.length >= 4) {
-      // Create auto match room
-      const matched = this.matchmakingQueue.splice(0, 4);
+    // Only match players who chose the same mode
+    const sameMode = this.matchmakingQueue.filter((m) => m.mode === targetSize);
+
+    if (sameMode.length >= targetSize) {
+      // Create auto match room from the first N same-mode entries
+      const matched = sameMode.slice(0, targetSize);
+      const matchedIds = new Set(matched.map((m) => m.socketId));
+      this.matchmakingQueue = this.matchmakingQueue.filter((m) => !matchedIds.has(m.socketId));
       const roomCode = this.generateRoomCode();
+      const seatOrder = getSeatOrder(targetSize);
 
       const defaultSettings: RoomSettings = {
+        playerCount: targetSize,
         turnTimeSeconds: 30,
         targetMatchScore: 11,
         drawRule6060: 'redeal',
@@ -224,13 +242,13 @@ export class RoomManager {
       };
 
       const players: Player[] = matched.map((m, idx) => {
-        const pos = POSITION_ORDER[idx];
+        const pos = seatOrder[idx];
         return {
           id: m.socketId,
           sessionToken: m.sessionToken,
           name: m.name,
           position: pos,
-          team: getTeamForPosition(pos),
+          team: getTeamForPosition(pos, targetSize),
           isHost: idx === 0,
           isReady: true,
           isConnected: true,
@@ -269,7 +287,7 @@ export class RoomManager {
         state: initialState,
         hands: new Map(),
         deck: createDeck(),
-        chat: [createSystemMessage('მატჩმეიკინგით 4 მოთამაშე შეგროვდა. თამაში მზადაა!', 'join')],
+        chat: [createSystemMessage(`მატჩმეიკინგით ${targetSize} მოთამაშე შეგროვდა. თამაში მზადაა!`, 'join')],
         lastActivity: Date.now(),
       };
 
@@ -279,10 +297,10 @@ export class RoomManager {
         this.socketToSession.set(m.socketId, m.sessionToken);
       }
 
-      return { inQueue: false, playersFound: 4 };
+      return { inQueue: false, playersFound: targetSize };
     }
 
-    return { inQueue: true, playersFound: this.matchmakingQueue.length };
+    return { inQueue: true, playersFound: sameMode.length };
   }
 
   public leaveMatchmaking(socketId: string) {
@@ -340,8 +358,9 @@ export class RoomManager {
       return { success: false, error: 'მხოლოდ ჰოსტს შეუძლია თამაშის დაწყება' };
     }
 
-    if (instance.state.players.length !== 4) {
-      return { success: false, error: 'თამაშის დასაწყებად საჭიროა ზუსტად 4 მოთამაშე' };
+    const required = instance.state.settings.playerCount;
+    if (instance.state.players.length !== required) {
+      return { success: false, error: `თამაშის დასაწყებად საჭიროა ზუსტად ${required} მოთამაშე` };
     }
 
     const allReady = instance.state.players.every((p) => p.isReady || p.isHost);
@@ -350,7 +369,7 @@ export class RoomManager {
     }
 
     // Deal round
-    const { state, cardsByPlayer } = initializeRound(
+    const { state, cardsByPlayer, deck } = initializeRound(
       instance.state,
       instance.hands,
       createDeck()
@@ -358,6 +377,7 @@ export class RoomManager {
 
     instance.state = state;
     instance.hands = cardsByPlayer;
+    instance.deck = deck; // persist the remaining draw pile for card draws
     instance.chat.push(createSystemMessage('თამაში დაიწყო! კოზირია: ' + state.trumpSuit, 'join'));
 
     return { success: true };
@@ -431,11 +451,11 @@ export class RoomManager {
     });
 
     // Advance turn or resolve trick
-    if (state.currentTrickCards.length === 4) {
+    if (state.currentTrickCards.length === state.settings.playerCount) {
       // Resolve trick
       this.resolveTrick(instance);
     } else {
-      state.currentTurnPosition = getNextPosition(state.currentTurnPosition);
+      state.currentTurnPosition = getNextPosition(state.currentTurnPosition, state.settings.playerCount);
       state.turnDeadline = Date.now() + (state.settings.turnTimeSeconds || 30) * 1000;
     }
 
@@ -446,7 +466,10 @@ export class RoomManager {
   private resolveTrick(instance: RoomInstance) {
     const state = instance.state;
     const winnerPos = state.currentTempWinnerPosition || state.currentTrickLeadPosition || 'south';
-    const winningTeam = getTeamForPosition(winnerPos);
+    const winnerPlayerForTeam = state.players.find((p) => p.position === winnerPos);
+    const winningTeam = winnerPlayerForTeam
+      ? winnerPlayerForTeam.team
+      : getTeamForPosition(winnerPos, state.settings.playerCount);
 
     // Sum all points in trick
     const allTrickCards = state.currentTrickCards.flatMap((t) => t.cards);
@@ -487,13 +510,14 @@ export class RoomManager {
 
   private drawCardsForPlayers(instance: RoomInstance, startPos: PlayerPosition) {
     const state = instance.state;
+    const playerCount = state.settings.playerCount;
     let pos = startPos;
 
     // Distribute 1 card at a time clockwise until everyone has 5 or deck is empty
     let cardsDrawnInPass = true;
     while (cardsDrawnInPass && instance.deck.length > 0) {
       cardsDrawnInPass = false;
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < playerCount; i++) {
         const p = state.players.find((pl) => pl.position === pos);
         if (p && p.cardsInHandCount < 5 && instance.deck.length > 0) {
           const card = instance.deck.pop();
@@ -505,7 +529,7 @@ export class RoomManager {
             cardsDrawnInPass = true;
           }
         }
-        pos = getNextPosition(pos);
+        pos = getNextPosition(pos, playerCount);
       }
     }
     state.deckRemainingCount = instance.deck.length;

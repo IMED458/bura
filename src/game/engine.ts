@@ -37,12 +37,29 @@ export const RANKS: Rank[] = ['6', '7', '8', '9', 'J', 'Q', 'K', '10', 'A'];
 
 export const POSITION_ORDER: PlayerPosition[] = ['south', 'west', 'north', 'east'];
 
-export function getNextPosition(pos: PlayerPosition): PlayerPosition {
-  const idx = POSITION_ORDER.indexOf(pos);
-  return POSITION_ORDER[(idx + 1) % 4];
+// In 2-player (1v1) mode only south & north seats are used and they sit opposite
+// each other; in 4-player (2v2) mode all four seats are used in clockwise order.
+export function getSeatOrder(playerCount: number = 4): PlayerPosition[] {
+  return playerCount === 2 ? ['south', 'north'] : POSITION_ORDER;
 }
 
-export function getTeamForPosition(pos: PlayerPosition): 1 | 2 {
+export function getNextPosition(
+  pos: PlayerPosition,
+  playerCount: number = 4
+): PlayerPosition {
+  const order = getSeatOrder(playerCount);
+  const idx = order.indexOf(pos);
+  return order[(idx + 1) % order.length];
+}
+
+export function getTeamForPosition(
+  pos: PlayerPosition,
+  playerCount: number = 4
+): 1 | 2 {
+  if (playerCount === 2) {
+    // 1v1: south is team 1, north is team 2
+    return pos === 'south' ? 1 : 2;
+  }
   return pos === 'south' || pos === 'north' ? 1 : 2;
 }
 
@@ -168,17 +185,18 @@ export function initializeRound(
   state: GameState,
   cardsByPlayer: Map<string, Card[]>,
   deck: Card[]
-): { state: GameState; cardsByPlayer: Map<string, Card[]> } {
+): { state: GameState; cardsByPlayer: Map<string, Card[]>; deck: Card[] } {
   const shuffled = shuffleDeck(deck.length === 36 ? deck : createDeck());
   const newCardsByPlayer = new Map<string, Card[]>();
+  const playerCount = state.settings.playerCount;
 
-  // Rotate dealer clockwise
+  // Rotate dealer clockwise (within the active seats)
   const dealerPos = state.roundNumber === 1
     ? 'south'
-    : getNextPosition(state.dealerPosition);
+    : getNextPosition(state.dealerPosition, playerCount);
 
   // First turn goes to dealer's left
-  const firstTurnPos = getNextPosition(dealerPos);
+  const firstTurnPos = getNextPosition(dealerPos, playerCount);
 
   // Deal 5 cards to each player
   const updatedPlayers = state.players.map((p) => {
@@ -201,6 +219,7 @@ export function initializeRound(
 
   const newState: GameState = {
     ...state,
+    players: updatedPlayers,
     phase: 'TURN_IN_PROGRESS',
     dealerPosition: dealerPos,
     currentTurnPosition: firstTurnPos,
@@ -219,5 +238,7 @@ export function initializeRound(
     turnDeadline: Date.now() + (state.settings.turnTimeSeconds || 30) * 1000,
   };
 
-  return { state: newState, cardsByPlayer: newCardsByPlayer };
+  // `shuffled` now holds the remaining draw pile (trump card sits at the
+  // bottom / front, so it is the last card drawn via deck.pop()).
+  return { state: newState, cardsByPlayer: newCardsByPlayer, deck: shuffled };
 }

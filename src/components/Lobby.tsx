@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ge } from '../i18n/ge';
-import { Volume2, VolumeX, BookOpen, Users, Search, PlusCircle, ArrowRight, Sparkles } from 'lucide-react';
+import { PlayerCount } from '../types/game';
+import { Volume2, VolumeX, BookOpen, Users, User, PlusCircle, ArrowRight, Sparkles } from 'lucide-react';
 import { soundEffects } from '../utils/audio';
 
 interface LobbyProps {
@@ -12,6 +13,8 @@ interface LobbyProps {
   onCancelMatchmaking: () => void;
   inMatchmaking: boolean;
   matchmakingCount: number;
+  mode: PlayerCount;
+  onSelectMode: (mode: PlayerCount) => void;
   onOpenHowToPlay: () => void;
   soundEnabled: boolean;
   setSoundEnabled: (enabled: boolean) => void;
@@ -27,6 +30,8 @@ export const Lobby: React.FC<LobbyProps> = ({
   onCancelMatchmaking,
   inMatchmaking,
   matchmakingCount,
+  mode,
+  onSelectMode,
   onOpenHowToPlay,
   soundEnabled,
   setSoundEnabled,
@@ -104,13 +109,48 @@ export const Lobby: React.FC<LobbyProps> = ({
         />
       </div>
 
+      {/* Game Mode Selector */}
+      <div className="w-full mb-6 z-10">
+        <label className="block text-xs font-bold text-slate-300 mb-1.5 text-left">
+          {ge.selectMode}
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => onSelectMode(2)}
+            disabled={inMatchmaking}
+            className={`flex flex-col items-center gap-1 py-3 px-3 rounded-2xl border text-xs font-bold transition-all disabled:opacity-50 ${
+              mode === 2
+                ? 'bg-amber-500/20 border-amber-400 text-amber-300 ring-2 ring-amber-400/40'
+                : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+            }`}
+          >
+            <User className="w-4 h-4" />
+            <span>{ge.mode2p}</span>
+            <span className="text-[10px] font-medium opacity-80">{ge.mode2pDesc}</span>
+          </button>
+          <button
+            onClick={() => onSelectMode(4)}
+            disabled={inMatchmaking}
+            className={`flex flex-col items-center gap-1 py-3 px-3 rounded-2xl border text-xs font-bold transition-all disabled:opacity-50 ${
+              mode === 4
+                ? 'bg-amber-500/20 border-amber-400 text-amber-300 ring-2 ring-amber-400/40'
+                : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>{ge.mode4p}</span>
+            <span className="text-[10px] font-medium opacity-80">{ge.mode4pDesc}</span>
+          </button>
+        </div>
+      </div>
+
       {/* Matchmaking Overlay or Main Action Buttons */}
       {inMatchmaking ? (
         <div className="w-full bg-slate-950/80 border border-amber-500/30 rounded-2xl p-5 text-center flex flex-col items-center gap-3 animate-pulse z-10">
           <div className="w-8 h-8 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
           <div className="text-xs font-bold text-amber-300">{ge.searchingMatch}</div>
           <div className="text-xs text-slate-400">
-            {ge.foundPlayers} <span className="text-amber-400 font-bold">{matchmakingCount}/4</span>
+            {ge.foundPlayers} <span className="text-amber-400 font-bold">{matchmakingCount}/{mode}</span>
           </div>
           <button
             onClick={onCancelMatchmaking}

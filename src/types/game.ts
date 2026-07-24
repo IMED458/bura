@@ -51,7 +51,10 @@ export interface DaviProposal {
   timestamp: number;
 }
 
+export type PlayerCount = 2 | 4;
+
 export interface RoomSettings {
+  playerCount: PlayerCount;    // 2 = 1v1 (south vs north), 4 = 2v2 teams
   turnTimeSeconds: number;     // 15, 30, 45, 60, 0 (unlimited)
   targetMatchScore: number;    // 3, 5, 7, 11
   drawRule6060: 'redeal' | 'carryover'; // default redeal
@@ -117,7 +120,7 @@ export interface ChatMessage {
 export type ClientMessage =
   | { type: 'JOIN_ROOM'; roomCode: string; name: string; sessionToken?: string }
   | { type: 'CREATE_ROOM'; name: string; settings?: Partial<RoomSettings> }
-  | { type: 'JOIN_MATCHMAKING'; name: string; sessionToken?: string }
+  | { type: 'JOIN_MATCHMAKING'; name: string; sessionToken?: string; mode?: PlayerCount }
   | { type: 'LEAVE_MATCHMAKING' }
   | { type: 'TOGGLE_READY' }
   | { type: 'START_GAME' }

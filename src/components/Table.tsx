@@ -40,6 +40,7 @@ export const Table: React.FC<TableProps> = ({
   };
 
   const isMyTurn = state.currentTurnPosition === myPosition;
+  const isTwoPlayer = state.settings.playerCount === 2;
 
   const toggleSelectCard = (card: Card) => {
     soundEffects.playCardSnap();
@@ -136,17 +137,19 @@ export const Table: React.FC<TableProps> = ({
 
       {/* MIDDLE ROW (WEST & EAST & CENTER TRICK AREA) */}
       <div className="relative z-10 flex items-center justify-between my-auto px-2 sm:px-6">
-        {/* WEST SEAT */}
-        <div className="flex flex-col items-center gap-2 max-w-[120px]">
-          {renderPlayerBadge(westPlayer, 'west')}
-          {westPlayer && (
-            <div className="flex -space-x-6 rotate-90 my-2">
-              {Array.from({ length: westPlayer.cardsInHandCount }).map((_, idx) => (
-                <CardSvg key={idx} faceDown size="sm" />
-              ))}
-            </div>
-          )}
-        </div>
+        {/* WEST SEAT (hidden in 1v1 mode) */}
+        {!isTwoPlayer && (
+          <div className="flex flex-col items-center gap-2 max-w-[120px]">
+            {renderPlayerBadge(westPlayer, 'west')}
+            {westPlayer && (
+              <div className="flex -space-x-6 rotate-90 my-2">
+                {Array.from({ length: westPlayer.cardsInHandCount }).map((_, idx) => (
+                  <CardSvg key={idx} faceDown size="sm" />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* CENTER TRICK PLAY AREA */}
         <div className="flex-1 flex flex-col items-center justify-center min-h-[160px] relative">
@@ -184,17 +187,19 @@ export const Table: React.FC<TableProps> = ({
           )}
         </div>
 
-        {/* EAST SEAT */}
-        <div className="flex flex-col items-center gap-2 max-w-[120px]">
-          {renderPlayerBadge(eastPlayer, 'east')}
-          {eastPlayer && (
-            <div className="flex -space-x-6 -rotate-90 my-2">
-              {Array.from({ length: eastPlayer.cardsInHandCount }).map((_, idx) => (
-                <CardSvg key={idx} faceDown size="sm" />
-              ))}
-            </div>
-          )}
-        </div>
+        {/* EAST SEAT (hidden in 1v1 mode) */}
+        {!isTwoPlayer && (
+          <div className="flex flex-col items-center gap-2 max-w-[120px]">
+            {renderPlayerBadge(eastPlayer, 'east')}
+            {eastPlayer && (
+              <div className="flex -space-x-6 -rotate-90 my-2">
+                {Array.from({ length: eastPlayer.cardsInHandCount }).map((_, idx) => (
+                  <CardSvg key={idx} faceDown size="sm" />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* BOTTOM SEAT (SOUTH - YOU & YOUR HAND) */}
