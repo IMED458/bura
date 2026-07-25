@@ -209,6 +209,8 @@ export class GameClient {
   proposeRaise(level: RaiseLevel) { return this.sendAction('PROPOSE_RAISE', { level }); }
   respondRaise(accept: boolean) { return this.sendAction('RESPOND_RAISE', { accept }); }
   declareBura() { return this.sendAction('DECLARE_BURA'); }
+  declareMolodka() { return this.sendAction('DECLARE_MOLODKA'); }
+  heartbeat() { if (this.code) void this.sendAction('HEARTBEAT').catch(() => {}); }
 
   async sendChat(name: string, text: string) {
     if (!this.code) return;

@@ -46,11 +46,17 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           {isMatchFinished ? ge.matchFinished : ge.roundFinished}
         </h2>
 
-        <p className="text-xs text-slate-400 mb-6">
+        <p className="text-xs text-slate-400 mb-1">
           {ge.winner}{' '}
           <span className="font-extrabold text-amber-300">
-            გუნდი {winningTeam} ({winningTeam === 1 ? 'სამხრეთი/ჩრდილოეთი' : 'დასავლეთი/აღმოსავლეთი'})
+            გუნდი {winningTeam}
           </span>
+        </p>
+        <p className="text-[11px] text-slate-300 mb-6 font-medium">
+          {state.players
+            .filter((p) => p.team === winningTeam)
+            .map((p) => p.name)
+            .join(' • ') || (winningTeam === 1 ? 'სამხრეთი/ჩრდილოეთი' : 'დასავლეთი/აღმოსავლეთი')}
         </p>
 
         {/* Scores Card */}

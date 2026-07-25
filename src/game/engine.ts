@@ -170,6 +170,17 @@ export function isBuraHand(hand: Card[], trumpSuit: Suit): boolean {
 }
 
 /**
+ * Check if hand is a "malyutka/molodka": 5 cards all of the same NON-trump suit
+ * (5 trumps is a Bura, not a malyutka).
+ */
+export function isMolodkaHand(hand: Card[], trumpSuit: Suit): boolean {
+  if (hand.length < 5) return false;
+  const suit = hand[0].suit;
+  if (suit === trumpSuit) return false;
+  return hand.every((c) => c.suit === suit);
+}
+
+/**
  * Check if cards played are all same suit (required for lead)
  */
 export function isSameSuitPlay(cards: Card[]): boolean {

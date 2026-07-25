@@ -89,6 +89,19 @@ export default function App() {
 
   useEffect(() => { if (name) localStorage.setItem('bura_name', name); }, [name]);
 
+  // Presence heartbeat: while in a room, tell the host we're still here so a
+  // slow-but-present player is never auto-played. Also fire immediately on
+  // becoming visible again (tab refocus / phone unlock).
+  useEffect(() => {
+    if (!gameState) return;
+    const beat = () => clientRef.current?.heartbeat();
+    beat();
+    const id = setInterval(beat, 8000);
+    const onVisible = () => { if (document.visibilityState === 'visible') beat(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVisible); };
+  }, [!!gameState]);
+
   const selectMode = (m: PlayerCount) => {
     setMode(m);
     localStorage.setItem('bura_mode', String(m));
@@ -140,6 +153,7 @@ export default function App() {
   const handleProposeRaise = (level: any) => { clientRef.current?.proposeRaise(level); soundEffects.playDaviRaise(); };
   const handleRespondRaise = (accept: boolean) => clientRef.current?.respondRaise(accept);
   const handleDeclareBura = () => clientRef.current?.declareBura();
+  const handleDeclareMolodka = () => clientRef.current?.declareMolodka();
   const handleSendChat = (text: string) => clientRef.current?.sendChat(name.trim() || 'მოთამაშე', text);
 
   const handleLeaveRoom = () => {
@@ -261,6 +275,7 @@ export default function App() {
               myPlayerId={myPlayerId}
               onPlayCards={handlePlayCards}
               onDeclareBura={handleDeclareBura}
+              onDeclareMolodka={handleDeclareMolodka}
             />
 
             <ScoreBoard

@@ -105,6 +105,19 @@ export class HostEngine {
 
   private async handle(actionId: string, action: ActionDoc) {
     const { uid, type, payload } = action;
+
+    // Heartbeats only refresh in-memory presence (used by tickTimers on the
+    // host). No full persist on every heartbeat — persist only if it caused a
+    // reconnect (so other clients see the player come back online).
+    if (type === 'HEARTBEAT') {
+      const before = this.room.state.players.find((p) => p.id === uid)?.isConnected;
+      this.room.heartbeat(uid);
+      const after = this.room.state.players.find((p) => p.id === uid)?.isConnected;
+      if (before === false && after) await this.persistAll();
+      await deleteDoc(doc(this.db, 'rooms', this.code, 'actions', actionId));
+      return;
+    }
+
     switch (type) {
       case 'JOIN':
         this.room.addPlayer(uid, payload?.name || 'მოთამაშე');
@@ -136,6 +149,9 @@ export class HostEngine {
         break;
       case 'DECLARE_BURA':
         this.room.declareBura(uid);
+        break;
+      case 'DECLARE_MOLODKA':
+        this.room.declareMolodka(uid);
         break;
     }
 

@@ -109,11 +109,52 @@ function testTurnTimeoutAutoPlay() {
   assert(reconnect.success && !!turnPlayer.isConnected, 'ტაიმერი: დაბრუნებულმა მოთამაშემ იგივე თამაშში განაგრძო');
 }
 
+// A present player (recent heartbeat) is NEVER auto-played, no matter how long.
+function testHeartbeatKeepsPresent() {
+  const room = BuraRoom.createNew('a', 'A', 'BURA-HB', true, { playerCount: 2 });
+  room.addPlayer('b', 'B');
+  room.setReady('b', true);
+  room.startGame('a');
+  const turnPlayer = room.state.players.find((p) => p.position === room.state.currentTurnPosition)!;
+  const handBefore = turnPlayer.cardsInHandCount;
+  const startedAt = room.state.turnStartedAt || Date.now();
+
+  // Keep heartbeating; even far past the old 30s deadline, no auto-disconnect/auto-play.
+  for (let t = 5_000; t <= 90_000; t += 5_000) {
+    room.heartbeat(turnPlayer.id, startedAt + t);
+    room.tickTimers(startedAt + t);
+  }
+  assert(turnPlayer.isConnected, 'heartbeat: present მოთამაშე online დარჩა');
+  assert(turnPlayer.cardsInHandCount === handBefore, 'heartbeat: present მოთამაშეს კარტი ავტომ. არ დაუდო');
+}
+
+// Malyutka: 5 cards of one non-trump suit.
+function testMolodkaDeclare() {
+  const room = BuraRoom.createNew('a', 'A', 'BURA-MOL', true, { playerCount: 2 });
+  room.addPlayer('b', 'B');
+  room.setReady('b', true);
+  room.startGame('a');
+  const trump = room.state.trumpSuit!;
+  const suit = (['hearts', 'diamonds', 'clubs', 'spades'] as const).find((s) => s !== trump)!;
+  const southUid = room.state.players.find((p) => p.position === 'south')!.id;
+  room.hands.set(southUid, ['A', 'K', 'Q', 'J', '10'].map((r) => ({ id: `${suit}_${r}`, suit, rank: r as any })));
+  const before = room.state.team1MatchScore;
+  const res = room.declareMolodka(southUid);
+  assert(res.success, 'მალიუტკა: გამოცხადება წარმატდა (5 ერთი მასტა)');
+  assert(room.state.team1MatchScore > before, 'მალიუტკა: გუნდმა 1 მიიღო ქულა');
+  // Trump hand must NOT qualify as malyutka.
+  room.hands.set(southUid, ['A', 'K', 'Q', 'J', '10'].map((r) => ({ id: `${trump}_${r}`, suit: trump, rank: r as any })));
+  const res2 = room.declareMolodka(southUid);
+  assert(!res2.success, 'მალიუტკა: 5 კოზირი მალიუტკად არ ითვლება');
+}
+
 console.log('=== BURA ROOM UNIT TESTS ===');
 playFullGame(2);
 playFullGame(4);
 testBuraDeclare();
 testRejections();
 testTurnTimeoutAutoPlay();
+testHeartbeatKeepsPresent();
+testMolodkaDeclare();
 console.log(`\n=== SUMMARY: ${pass} Passed, ${fail} Failed ===`);
 process.exit(fail > 0 ? 1 : 0);

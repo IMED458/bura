@@ -19,6 +19,7 @@ export interface Player {
   isReady: boolean;
   isConnected: boolean;
   disconnectedAt?: number;
+  lastSeen?: number;        // last heartbeat timestamp (presence detection)
   cardsInHandCount: number; // Public count sent to other players
   hand?: Card[];           // Only sent to the specific player
 }

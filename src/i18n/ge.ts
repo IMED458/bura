@@ -52,6 +52,7 @@ export const ge = {
   waitingForTurn: 'სვლას აკეთებს:',
   playSelectedCards: 'არჩეული კარტის დადება',
   declareBura: '🔥 ბურას გამოცხადება',
+  declareMolodka: 'მალიუტკას გამოცხადება',
   davi: 'დავი (2 ქ)',
   se: 'სე (3 ქ)',
   chari: 'ჩარი (4 ქ)',

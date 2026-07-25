@@ -28,6 +28,7 @@ import {
   getTeamForPosition,
   initializeRound,
   isBuraHand,
+  isMolodkaHand,
   isSameSuitPlay,
 } from './engine';
 import { createSystemMessage } from './chat';
@@ -36,7 +37,9 @@ type NewChat = Omit<ChatMessage, 'id'>;
 export type ActionResult = { success: boolean; error?: string };
 
 const WARNING_AFTER_MS = 15_000;
-const DISCONNECT_AFTER_MS = 30_000;
+// A player is considered present as long as a heartbeat arrived within this
+// window. Present players are NEVER auto-played, no matter how long they think.
+const PRESENCE_TIMEOUT_MS = 25_000;
 const AUTO_PLAY_AFTER_DISCONNECT_MS = 20_000;
 
 export const DEFAULT_SETTINGS: RoomSettings = {
@@ -285,15 +288,41 @@ export class BuraRoom {
     state.turnStartedAt = now;
     state.turnWarningAt = now + WARNING_AFTER_MS;
     state.turnWarningSent = false;
-    if (player && !player.isConnected) {
+    state.turnDeadline = null;
+    // Present players have unlimited time; only an already-gone player gets a
+    // pending auto-play deadline so the game doesn't stall forever.
+    if (player && !this.isPresent(player, now)) {
       const disconnectedAt = player.disconnectedAt || now;
       player.disconnectedAt = disconnectedAt;
       state.autoPlayDeadline = disconnectedAt + AUTO_PLAY_AFTER_DISCONNECT_MS;
-      state.turnDeadline = state.autoPlayDeadline;
     } else {
       state.autoPlayDeadline = null;
-      state.turnDeadline = now + DISCONNECT_AFTER_MS;
     }
+  }
+
+  /** A player counts as present if a heartbeat arrived recently and they have
+   *  not explicitly left. Absent turn start defaults to the turn start time. */
+  private isPresent(player: Player, now: number): boolean {
+    if (player.isConnected === false) return false;
+    const seen = player.lastSeen ?? this.state.turnStartedAt ?? now;
+    return now - seen < PRESENCE_TIMEOUT_MS;
+  }
+
+  /** Client heartbeat: keeps the player marked present (never auto-played). */
+  heartbeat(uid: string, now = Date.now()): ActionResult {
+    const state = this.state;
+    const player = state.players.find((p) => p.id === uid);
+    if (!player) return { success: false };
+    player.lastSeen = now;
+    if (!player.isConnected) {
+      player.isConnected = true;
+      player.disconnectedAt = undefined;
+      if (state.phase === 'TURN_IN_PROGRESS' && player.position === state.currentTurnPosition) {
+        state.autoPlayDeadline = null;
+        this.say(`${player.name} დაბრუნდა თამაშში`, 'join');
+      }
+    }
+    return { success: true };
   }
 
   private sortCardsForAuto(cards: Card[]): Card[] {
@@ -368,34 +397,32 @@ export class BuraRoom {
     const player = state.players.find((p) => p.position === state.currentTurnPosition);
     if (!player) return false;
 
-    if (!player.isConnected) {
-      if (!state.autoPlayDeadline) {
-        state.autoPlayDeadline = (player.disconnectedAt || now) + AUTO_PLAY_AFTER_DISCONNECT_MS;
-        state.turnDeadline = state.autoPlayDeadline;
-        return true;
-      }
-      if (now >= state.autoPlayDeadline) {
-        this.autoPlayCurrentTurn('disconnected');
+    // Present player: unlimited time, NEVER auto-played. One soft warning only.
+    if (this.isPresent(player, now)) {
+      if (state.autoPlayDeadline) { state.autoPlayDeadline = null; return true; }
+      if (!state.turnWarningSent && state.turnWarningAt && now >= state.turnWarningAt) {
+        state.turnWarningSent = true;
         return true;
       }
       return false;
     }
 
-    if (!state.turnWarningSent && state.turnWarningAt && now >= state.turnWarningAt) {
-      state.turnWarningSent = true;
-      this.say(`${player.name}, 15 წამი დაგრჩათ სვლისთვის`, 'join');
-      return true;
-    }
-
-    if (state.turnDeadline && now >= state.turnDeadline) {
+    // Player appears genuinely gone (no recent heartbeat, or left).
+    if (player.isConnected) {
       player.isConnected = false;
       player.disconnectedAt = now;
       state.autoPlayDeadline = now + AUTO_PLAY_AFTER_DISCONNECT_MS;
-      state.turnDeadline = state.autoPlayDeadline;
-      this.say(`${player.name} დროის ამოწურვის გამო დროებით გავიდა თამაშიდან. 20 წამში კარტი ავტომატურად დაიდება.`, 'leave');
+      this.say(`${player.name} კავშირიდან გავიდა. 20 წამში ავტომატური სვლა.`, 'leave');
       return true;
     }
-
+    if (!state.autoPlayDeadline) {
+      state.autoPlayDeadline = (player.disconnectedAt || now) + AUTO_PLAY_AFTER_DISCONNECT_MS;
+      return true;
+    }
+    if (now >= state.autoPlayDeadline) {
+      this.autoPlayCurrentTurn('disconnected');
+      return true;
+    }
     return false;
   }
 
@@ -617,6 +644,33 @@ export class BuraRoom {
     state.phase = 'ROUND_FINISHED';
     state.winningTeam = player.team;
     this.say(`🔥 ${player.name}-მ გამოაცხადა ბურა! გუნდმა ${player.team} მოიგო რაუნდი!`, 'bura');
+
+    if (
+      state.team1MatchScore >= state.settings.targetMatchScore ||
+      state.team2MatchScore >= state.settings.targetMatchScore
+    ) {
+      state.phase = 'MATCH_FINISHED';
+      this.say(`🏆 მატჩი დასრულდა! გამარჯვებულია გუნდი ${player.team}`, 'round_win');
+    }
+    return { success: true };
+  }
+
+  /** Malyutka/Molodka: instant round win for holding 5 cards of one non-trump suit. */
+  declareMolodka(uid: string): ActionResult {
+    const state = this.state;
+    const player = state.players.find((p) => p.id === uid);
+    if (!player || !state.trumpSuit) return { success: false, error: 'შეცდომა' };
+
+    const hand = this.hands.get(uid) || [];
+    if (!isMolodkaHand(hand, state.trumpSuit)) {
+      return { success: false, error: 'თქვენ არ გაქვთ 5 ერთი მასტის (არა-კოზირი) კარტი!' };
+    }
+
+    if (player.team === 1) state.team1MatchScore += state.currentRaiseLevel;
+    else state.team2MatchScore += state.currentRaiseLevel;
+    state.phase = 'ROUND_FINISHED';
+    state.winningTeam = player.team;
+    this.say(`🃏 ${player.name}-მ გამოაცხადა მალიუტკა (5 ერთი მასტა)! გუნდმა ${player.team} მოიგო რაუნდი!`, 'bura');
 
     if (
       state.team1MatchScore >= state.settings.targetMatchScore ||

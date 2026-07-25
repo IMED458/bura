@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { Card, GameState, Player, PlayerPosition, Rank, Suit } from '../types/game';
 import { CardSvg } from './CardSvg';
+import { isBuraHand, isMolodkaHand } from '../game/engine';
 import { soundEffects } from '../utils/audio';
-import { User, WifiOff, CheckCircle2 } from 'lucide-react';
+import { User, WifiOff, CheckCircle2, Flame } from 'lucide-react';
 import { ge } from '../i18n/ge';
 
 interface TableProps {
@@ -11,6 +12,7 @@ interface TableProps {
   myPlayerId: string;
   onPlayCards: (cardIds: string[]) => void;
   onDeclareBura: () => void;
+  onDeclareMolodka: () => void;
 }
 
 const SUIT_ORDER: Record<Suit, number> = { hearts: 0, diamonds: 1, clubs: 2, spades: 3 };
@@ -22,6 +24,7 @@ export const Table: React.FC<TableProps> = ({
   myPlayerId,
   onPlayCards,
   onDeclareBura,
+  onDeclareMolodka,
 }) => {
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
 
@@ -69,6 +72,21 @@ export const Table: React.FC<TableProps> = ({
   const showTrickWinner =
     state.phase === 'TRICK_RESOLUTION' && state.currentTrickCards.length === state.settings.playerCount;
   const currentTrickCardCount = state.currentTrickCards.reduce((sum, trick) => sum + trick.cards.length, 0);
+
+  // Declaration eligibility — only shown when the hand actually qualifies.
+  const canDeclareBura = !!state.trumpSuit && state.phase === 'TURN_IN_PROGRESS' && isBuraHand(hand, state.trumpSuit);
+  const canDeclareMolodka = !!state.trumpSuit && state.phase === 'TURN_IN_PROGRESS' && isMolodkaHand(hand, state.trumpSuit);
+
+  // When the trick resolves, slide the whole pile toward the winner's seat, then it fades out.
+  const winnerRel = showTrickWinner && state.currentTempWinnerPosition
+    ? getRelativePosition(state.currentTempWinnerPosition)
+    : null;
+  const trickSlide =
+    winnerRel === 'south' ? 'translateY(300px)'
+    : winnerRel === 'north' ? 'translateY(-300px)'
+    : winnerRel === 'west' ? 'translateX(-340px)'
+    : winnerRel === 'east' ? 'translateX(300px)'
+    : 'none';
   const selectedCards = sortedHand.filter((card) => selectedCardIds.includes(card.id));
   const selectedCardsAreSameSuit =
     selectedCards.length > 0 && selectedCards.every((card) => card.suit === selectedCards[0].suit);
@@ -208,7 +226,16 @@ export const Table: React.FC<TableProps> = ({
                 </div>
               )}
 
-              <div className="relative h-[190px] w-[190px] sm:w-[220px] bg-emerald-950/50 rounded-2xl border border-emerald-500/20 backdrop-blur-md overflow-visible">
+              <div
+                className="relative h-[190px] w-[190px] sm:w-[220px] bg-emerald-950/50 rounded-2xl border border-emerald-500/20 backdrop-blur-md overflow-visible"
+                style={{
+                  transform: showTrickWinner ? trickSlide : 'none',
+                  opacity: showTrickWinner ? 0 : 1,
+                  transition: showTrickWinner
+                    ? 'transform 900ms ease-in 1200ms, opacity 700ms ease-in 1500ms'
+                    : 'none',
+                }}
+              >
               {state.currentTrickCards.map((trick, idx) => {
                 const isWinner = state.currentTempWinnerPosition === trick.playerPosition;
                 const playerName = state.players.find((p) => p.id === trick.playerId)?.name || trick.playerPosition;
@@ -261,7 +288,30 @@ export const Table: React.FC<TableProps> = ({
 
       {/* BOTTOM SEAT (SOUTH - YOU & YOUR HAND) */}
       <div className="relative z-10 flex flex-col items-center gap-2">
-        {/* Action Controls when it's your turn */}
+        {/* Declaration buttons — only when your hand actually qualifies */}
+        {(canDeclareBura || canDeclareMolodka) && (
+          <div className="flex items-center gap-2 mb-1">
+            {canDeclareBura && (
+              <button
+                onClick={onDeclareBura}
+                className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white font-black px-4 py-2 rounded-xl text-xs shadow-lg transition-all flex items-center gap-1.5 border border-red-300 ring-2 ring-red-400/40 animate-pulse"
+              >
+                <Flame className="w-4 h-4" />
+                <span>{ge.declareBura}</span>
+              </button>
+            )}
+            {canDeclareMolodka && (
+              <button
+                onClick={onDeclareMolodka}
+                className="bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-500 hover:to-purple-500 text-white font-black px-4 py-2 rounded-xl text-xs shadow-lg transition-all flex items-center gap-1.5 border border-fuchsia-300 ring-2 ring-fuchsia-400/40 animate-pulse"
+              >
+                <span>🃏 {ge.declareMolodka}</span>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Play control when it's your turn */}
         {isMyTurn && state.phase === 'TURN_IN_PROGRESS' && (
           <div className="flex items-center gap-2 mb-1 animate-bounce">
             <button
@@ -275,13 +325,6 @@ export const Table: React.FC<TableProps> = ({
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>{ge.playSelectedCards} ({selectedCardIds.length})</span>
-            </button>
-
-            <button
-              onClick={onDeclareBura}
-              className="bg-red-600 hover:bg-red-500 text-white font-bold px-3 py-2 rounded-xl text-xs shadow-md transition-all flex items-center gap-1 border border-red-400"
-            >
-              <span>{ge.declareBura}</span>
             </button>
           </div>
         )}
