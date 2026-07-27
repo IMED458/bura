@@ -23,6 +23,9 @@ import { RaiseLevel } from '../types/game';
 // Firestore rejects `undefined`; JSON round-trip strips it from plain data.
 const clean = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 const TRICK_REVEAL_DELAY_MS = 2400;
+// How long the finished-round result stays on screen before the host deals the
+// next round automatically (only when the match itself has not been won yet).
+const ROUND_ADVANCE_DELAY_MS = 3200;
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export interface ActionDoc {
@@ -101,6 +104,19 @@ export class HostEngine {
       this.room.resolvePendingTrick();
       await this.persistAll();
     }
+    await this.maybeAdvanceRound();
+  }
+
+  /** When a round finishes but the match is still going, deal the next round
+   *  automatically after a short pause — no "play again" button needed. */
+  private async maybeAdvanceRound() {
+    if (this.room.state.phase !== 'ROUND_FINISHED') return;
+    await wait(ROUND_ADVANCE_DELAY_MS);
+    if (this.room.state.phase !== 'ROUND_FINISHED') return; // someone reset it meanwhile
+    const host = this.room.state.players.find((p) => p.isHost);
+    if (!host) return;
+    const res = this.room.startNextRound(host.id);
+    if (res.success) await this.persistAll();
   }
 
   private async handle(actionId: string, action: ActionDoc) {
@@ -177,6 +193,8 @@ export class HostEngine {
       this.room.resolvePendingTrick();
       await this.persistAll();
     }
+
+    await this.maybeAdvanceRound();
 
     await deleteDoc(doc(this.db, 'rooms', this.code, 'actions', actionId));
     if (!this.room.state.isPrivate) await this.updateMatchmaking();

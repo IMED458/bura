@@ -312,6 +312,7 @@ export default function App() {
               onPlayCards={handlePlayCards}
               onDeclareBura={handleDeclareBura}
               onDeclareMolodka={handleDeclareMolodka}
+              onProposeRaise={handleProposeRaise}
             />
 
             <ScoreBoard
@@ -341,11 +342,13 @@ export default function App() {
           />
         )}
 
-        {gameState && (gameState.phase === 'ROUND_FINISHED' || gameState.phase === 'MATCH_FINISHED') && (
+        {/* Only the whole match ending is a hard stop; individual rounds continue
+            automatically (the host deals the next round), so no button needed. */}
+        {gameState && gameState.phase === 'MATCH_FINISHED' && (
           <GameOverModal
             state={gameState}
             myPlayerId={myPlayerId}
-            onRematch={gameState.phase === 'ROUND_FINISHED' ? handleNextRound : handleNewMatch}
+            onRematch={handleNewMatch}
             onBackToLobby={handleLeaveRoom}
           />
         )}

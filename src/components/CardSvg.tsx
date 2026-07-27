@@ -8,6 +8,7 @@ interface CardSvgProps {
   isTrump?: boolean;
   trumpMark?: boolean;
   onClick?: () => void;
+  onDoubleClick?: () => void;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
 }
@@ -19,6 +20,7 @@ export const CardSvg: React.FC<CardSvgProps> = ({
   isTrump = false,
   trumpMark = false,
   onClick,
+  onDoubleClick,
   size = 'md',
   className = '',
 }) => {
@@ -52,20 +54,22 @@ export const CardSvg: React.FC<CardSvgProps> = ({
     md: 'bura-card bura-card-md text-sm',
     lg: 'bura-card bura-card-lg text-base',
   }[size];
+  // Kept deliberately compact so the top/centre/bottom labels always fit inside
+  // the white card at every responsive size (nothing spills below the card).
   const cornerText = {
-    sm: 'text-[10px]',
-    md: 'text-xs sm:text-sm',
-    lg: 'text-sm sm:text-base',
+    sm: 'text-[9px]',
+    md: 'text-[11px] sm:text-xs',
+    lg: 'text-sm',
   }[size];
   const suitText = {
-    sm: 'text-[10px]',
-    md: 'text-xs sm:text-sm',
-    lg: 'text-sm sm:text-base',
+    sm: 'text-[8px]',
+    md: 'text-[10px]',
+    lg: 'text-xs',
   }[size];
   const centerText = {
-    sm: 'text-xl',
-    md: 'text-2xl sm:text-3xl',
-    lg: 'text-3xl sm:text-4xl',
+    sm: 'text-sm',
+    md: 'text-xl sm:text-2xl',
+    lg: 'text-2xl sm:text-3xl',
   }[size];
 
   if (faceDown || !card) {
@@ -93,12 +97,13 @@ export const CardSvg: React.FC<CardSvgProps> = ({
   return (
     <div
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
       role={onClick ? 'button' : 'img'}
       tabIndex={onClick ? 0 : undefined}
       aria-label={ariaLabel}
       aria-pressed={onClick ? selected : undefined}
-      className={`relative rounded-xl border bg-white p-1.5 shadow-md transition-all duration-200 select-none ${onClick ? 'cursor-pointer' : ''} ${dimensions} ${colorClass} ${
+      className={`relative rounded-xl border bg-white p-1 shadow-md transition-all duration-200 select-none ${onClick ? 'cursor-pointer' : ''} ${dimensions} ${colorClass} ${
         selected
           ? '-translate-y-4 ring-4 ring-amber-400 shadow-xl z-20 border-amber-400'
           : `${onClick ? 'hover:-translate-y-1 hover:shadow-lg' : ''} ${isTrump ? 'border-amber-400 ring-1 ring-amber-300/70' : 'border-slate-200'}`
@@ -110,7 +115,7 @@ export const CardSvg: React.FC<CardSvgProps> = ({
         </span>
       )}
 
-      <div className="grid h-full grid-rows-[auto_1fr_auto]">
+      <div className="grid h-full grid-rows-[auto_1fr_auto] overflow-hidden">
         {/* Top Left Rank & Suit */}
         <div className="flex flex-col items-start leading-none">
           <span className={`font-extrabold tracking-tight ${cornerText}`}>{card.rank}</span>

@@ -3,7 +3,7 @@ import { Card, GameState, Player, PlayerPosition, Rank, Suit } from '../types/ga
 import { CardSvg } from './CardSvg';
 import { isBuraHand, isMolodkaHand } from '../game/engine';
 import { soundEffects } from '../utils/audio';
-import { User, WifiOff, CheckCircle2, Flame, Crown } from 'lucide-react';
+import { User, WifiOff, CheckCircle2, Flame, Crown, Layers } from 'lucide-react';
 import { ge } from '../i18n/ge';
 
 interface TableProps {
@@ -13,6 +13,7 @@ interface TableProps {
   onPlayCards: (cardIds: string[]) => void;
   onDeclareBura: () => void;
   onDeclareMolodka: () => void;
+  onProposeRaise: (level: number) => void;
 }
 
 type RelPos = 'south' | 'west' | 'north' | 'east';
@@ -30,6 +31,7 @@ export const Table: React.FC<TableProps> = ({
   onPlayCards,
   onDeclareBura,
   onDeclareMolodka,
+  onProposeRaise,
 }) => {
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
 
@@ -108,6 +110,31 @@ export const Table: React.FC<TableProps> = ({
     setSelectedCardIds([]);
   };
 
+  // Double-click a card to play it immediately — but only when a single card is
+  // a legal move (leading, or following a one-card trick).
+  const canPlaySingle =
+    isMyTurn &&
+    state.phase === 'TURN_IN_PROGRESS' &&
+    (state.currentTrickCards.length === 0 || state.requiredCardCount === 1);
+  const playSingle = (card: Card) => {
+    if (!canPlaySingle) return;
+    onPlayCards([card.id]);
+    setSelectedCardIds([]);
+  };
+
+  // Offer (davi / se / chari …) eligibility — offers only at the top of the
+  // round and only by the team allowed to escalate next.
+  const myTeam = myPlayer?.team;
+  const raiseWindowOpen =
+    state.phase === 'TURN_IN_PROGRESS' && !state.roundCardPlayed && state.currentRaiseLevel < 6;
+  const teamEligibleToRaise =
+    state.raiseEligibleTeam === null || state.raiseEligibleTeam === myTeam;
+  const nextRaiseLevel = state.currentRaiseLevel + 1;
+  const canProposeRaise = raiseWindowOpen && teamEligibleToRaise;
+  const raiseDisabledReason = !teamEligibleToRaise
+    ? ge.raiseOnlyOpponent.replace('{name}', ge.raiseNames[nextRaiseLevel] || '')
+    : '';
+
   // ---- seat badge ----------------------------------------------------------
   const renderPlayerBadge = (player?: Player, compact = false) => {
     if (!player) {
@@ -158,7 +185,7 @@ export const Table: React.FC<TableProps> = ({
           </div>
           {!compact && (
             <span className="text-[9px] text-rose-100/70 truncate">
-              გუნდი {player.team} · {teamScore} ქ · {player.cardsInHandCount} კარტი
+              გუნდი {player.team} · {player.cardsInHandCount} კარტი
             </span>
           )}
         </div>
@@ -226,7 +253,7 @@ export const Table: React.FC<TableProps> = ({
 
   return (
     <div className="bura-table bura-table-felt relative rounded-[28px] border-4 border-amber-900/50 flex flex-col justify-between p-3 sm:p-5 select-none overflow-hidden">
-      {/* Trump indicator — always visible, its own block */}
+      {/* Trump indicator + remaining deck count — always visible, its own block */}
       {state.trumpCard && state.trumpSuit && (
         <div className="absolute top-2.5 right-2.5 sm:top-4 sm:right-4 z-30 flex flex-col items-center gap-1 bg-black/45 border border-amber-300/50 rounded-2xl px-2 py-2 shadow-xl backdrop-blur-md">
           <CardSvg card={state.trumpCard} size="sm" isTrump trumpMark />
@@ -237,6 +264,10 @@ export const Table: React.FC<TableProps> = ({
             <span>{ge.trump}</span>
           </div>
           <span className="text-[9px] text-rose-100/70">{SUIT_NAME[state.trumpSuit]}</span>
+          <div className="mt-0.5 flex items-center gap-1 text-[10px] font-bold text-amber-100 bg-black/40 rounded-full px-2 py-0.5 border border-white/10">
+            <Layers className="w-3 h-3" />
+            <span>{ge.deckLabel}: {state.deckRemainingCount}</span>
+          </div>
         </div>
       )}
 
@@ -300,9 +331,10 @@ export const Table: React.FC<TableProps> = ({
                   height: '100%',
                   transform: trickSlide,
                   opacity: showTrickWinner ? 0 : 1,
-                  transition: showTrickWinner
-                    ? 'transform 850ms cubic-bezier(0.22,1,0.36,1) 1100ms, opacity 600ms ease-in 1500ms'
-                    : 'none',
+                  // Always-on transition so the pile visibly glides toward the
+                  // winner's seat (after a beat) instead of snapping.
+                  transition:
+                    'transform 800ms cubic-bezier(0.22,1,0.36,1) 900ms, opacity 550ms ease-in 1350ms',
                 }}
               >
                 <div className="relative w-full h-full">
@@ -321,7 +353,25 @@ export const Table: React.FC<TableProps> = ({
       </div>
 
       {/* BOTTOM SEAT (SOUTH — YOU) */}
-      <div className="relative z-10 flex flex-col items-center gap-2">
+      <div className="relative z-10 flex flex-col items-center gap-1.5">
+        {/* Offer controls (davi / se / chari …) — only at the top of the round */}
+        {raiseWindowOpen && (
+          <button
+            onClick={() => canProposeRaise && onProposeRaise(nextRaiseLevel)}
+            disabled={!canProposeRaise}
+            title={canProposeRaise ? undefined : raiseDisabledReason}
+            aria-label={ge.declareNext.replace('{name}', ge.raiseNames[nextRaiseLevel] || '')}
+            className={`font-black px-5 py-2 rounded-xl text-xs shadow-lg transition-all flex items-center gap-1.5 border ${
+              canProposeRaise
+                ? 'bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-400 hover:to-red-500 text-white border-orange-200 ring-2 ring-orange-400/40 animate-pulse'
+                : 'bg-black/30 text-rose-200/50 cursor-not-allowed border-white/10'
+            }`}
+          >
+            <Flame className="w-4 h-4" />
+            <span>{ge.raiseNamesLong[nextRaiseLevel] || ge.raiseNames[nextRaiseLevel]} {ge.declareVerb}</span>
+          </button>
+        )}
+
         {/* Declaration buttons — only when your hand qualifies */}
         {(canDeclareBura || canDeclareMolodka) && (
           <div className="flex items-center gap-2">
@@ -362,8 +412,13 @@ export const Table: React.FC<TableProps> = ({
           </button>
         )}
 
+        {renderPlayerBadge(southPlayer)}
+        {isMyTurn && state.phase === 'TURN_IN_PROGRESS' && (
+          <span className="text-[9px] text-rose-100/60">{ge.doubleClickHint}</span>
+        )}
+
         {/* Your hand */}
-        <div className="flex items-end justify-center overflow-x-auto max-w-full px-1 pt-2">
+        <div className="flex items-end justify-center overflow-x-auto max-w-full px-1">
           <div className="flex items-end -space-x-3 sm:-space-x-2">
             {sortedHand.map((card) => (
               <CardSvg
@@ -373,13 +428,12 @@ export const Table: React.FC<TableProps> = ({
                 isTrump={card.suit === state.trumpSuit}
                 trumpMark={state.trumpCard?.id === card.id}
                 onClick={() => toggleSelectCard(card)}
+                onDoubleClick={() => playSingle(card)}
                 size="md"
               />
             ))}
           </div>
         </div>
-
-        {renderPlayerBadge(southPlayer)}
       </div>
     </div>
   );

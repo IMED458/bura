@@ -93,33 +93,14 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
             {ge.matchScore} <span className="font-bold text-amber-400">{targetMatchScore}</span>)
           </div>
           <div>რაუნდის ფასი <span className="font-bold text-amber-300">{levelNames[currentRaiseLevel] || currentRaiseLevel}</span></div>
-          <div>წაყვანილია <span className="font-bold text-emerald-300">{takenCardCount} კარტი</span></div>
         </div>
       </div>
 
-      {/* Trump & Deck Status */}
+      {/* Remaining deck */}
       <div className="flex items-center gap-4">
-        {raiseWindowOpen && (
-          <button
-            onClick={() => canRaise && onProposeRaise?.(nextRaiseLevel)}
-            disabled={!canRaise}
-            title={canRaise ? undefined : raiseDisabledReason}
-            aria-label={ge.declareNext.replace('{name}', levelNames[nextRaiseLevel] || '')}
-            className={`flex items-center gap-1.5 font-black px-3 py-2 rounded-xl text-xs shadow-md transition-colors ${
-              canRaise
-                ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
-                : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
-            }`}
-          >
-            <Flame className="w-4 h-4" />
-            <span>{levelNames[nextRaiseLevel]}</span>
-          </button>
-        )}
-
-        {/* Deck Count */}
         <div className="flex items-center gap-1.5 text-xs text-slate-300 bg-slate-950/40 px-2.5 py-1.5 rounded-xl border border-slate-800">
           <Layers className="w-4 h-4 text-amber-400" />
-          <span>{deckRemainingCount} კარტი</span>
+          <span>{ge.deckLabel}: {deckRemainingCount} {ge.cardsWord}</span>
         </div>
       </div>
     </div>
