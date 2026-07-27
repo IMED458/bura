@@ -58,12 +58,34 @@ export const ge = {
   chari: 'ჩარი (4 ქ)',
   fanji: 'ფანჯი (5 ქ)',
   shashi: 'შაში (6 ქ)',
+  emptySeat: 'ცარიელი ადგილი',
+  trickTakenBy: 'ხელი წაიღო',
+  cardsWord: 'კარტი',
+  turnWarning: 'გაფრთხილება — დროა ჩამოხვიდე',
+  autoPlayPending: 'კავშირი გაწყვეტილია — ავტომატური სვლა მზადდება',
+  // Short raise labels keyed by raise level.
+  raiseNames: { 1: 'ჩვეულებრივი', 2: 'დავი', 3: 'სე', 4: 'ჩარი', 5: 'ფანჯი', 6: 'შაში' } as Record<number, string>,
+  raiseNamesLong: { 2: 'დავი (2 ქ)', 3: 'სე (3 ქ)', 4: 'ჩარი (4 ქ)', 5: 'ფანჯი (5 ქ)', 6: 'შაში (6 ქ)' } as Record<number, string>,
   
-  // Davi modal
+  // Davi modal / offer panel
   raiseProposed: 'შემოთავაზებულია გაზრდა!',
   proposedBy: 'გამოაცხადა:',
-  accept: 'მიღება',
-  reject: 'უარი (დათმობა)',
+  accept: 'კი',
+  reject: 'არა',
+  waitingResponse: 'ველოდებით პასუხს',
+  waitingTeamResponse: 'ველოდებით გუნდი {t}-ის პასუხს...',
+  teamDeclared: 'გუნდმა {t} გამოაცხადა',
+  yourTeamResponds: 'თქვენი გუნდის პასუხი:',
+  raiseOnlyOpponent: '„{name}" გამოცხადება მხოლოდ მოწინააღმდეგე გუნდს შეუძლია',
+  raiseAfterCard: 'კარტის ჩამოსვლის შემდეგ შეთავაზებას ვეღარ გამოაცხადებ',
+  declareNext: '{name} გამოცხადება',
+
+  // Team switcher (lobby)
+  teamSwitchTitle: 'გუნდები და წყვილები',
+  moveToTeam1: '→ გუნდი 1',
+  moveToTeam2: '→ გუნდი 2',
+  teamNeedsTwo: 'ორივე გუნდში ზუსტად ორი მოთამაშე უნდა იყოს',
+  hostCanSwap: 'ჰოსტს შეუძლია ნებისმიერი მოთამაშის გადაყვანა',
   
   // Scores & Status
   roundScore: 'მიმდინარე ხელის ქულები:',

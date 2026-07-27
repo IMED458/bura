@@ -13,7 +13,11 @@ interface ScoreBoardProps {
   deckRemainingCount: number;
   players: Player[];
   onProposeRaise?: (level: any) => void;
-  canRaise?: boolean;
+  // Raise eligibility (§7 alternating offers).
+  phase?: string;
+  myTeam?: 1 | 2;
+  raiseEligibleTeam?: 1 | 2 | null;
+  roundCardPlayed?: boolean;
 }
 
 export const ScoreBoard: React.FC<ScoreBoardProps> = ({
@@ -26,7 +30,10 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
   deckRemainingCount,
   players,
   onProposeRaise,
-  canRaise = false,
+  phase,
+  myTeam,
+  raiseEligibleTeam = null,
+  roundCardPlayed = false,
 }) => {
   const levelNames: Record<number, string> = {
     1: 'ჩვეულებრივი',
@@ -37,6 +44,16 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
     6: ge.shashi,
   };
   const nextRaiseLevel = (currentRaiseLevel + 1) as any;
+
+  // A raise can be offered only at the top of the round, by the eligible team.
+  const raiseWindowOpen = phase === 'TURN_IN_PROGRESS' && !roundCardPlayed && currentRaiseLevel < 6;
+  const teamEligible = raiseEligibleTeam === null || raiseEligibleTeam === myTeam;
+  const canRaise = raiseWindowOpen && teamEligible;
+  const raiseDisabledReason = roundCardPlayed
+    ? ge.raiseAfterCard
+    : !teamEligible
+      ? ge.raiseOnlyOpponent.replace('{name}', ge.raiseNames[nextRaiseLevel] || '')
+      : '';
   const takenCardCount = team1TakenCardCount + team2TakenCardCount;
   const teamNames = (team: 1 | 2) =>
     players
@@ -82,10 +99,17 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
 
       {/* Trump & Deck Status */}
       <div className="flex items-center gap-4">
-        {canRaise && currentRaiseLevel < 6 && (
+        {raiseWindowOpen && (
           <button
-            onClick={() => onProposeRaise?.(nextRaiseLevel)}
-            className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-3 py-2 rounded-xl text-xs shadow-md transition-colors"
+            onClick={() => canRaise && onProposeRaise?.(nextRaiseLevel)}
+            disabled={!canRaise}
+            title={canRaise ? undefined : raiseDisabledReason}
+            aria-label={ge.declareNext.replace('{name}', levelNames[nextRaiseLevel] || '')}
+            className={`flex items-center gap-1.5 font-black px-3 py-2 rounded-xl text-xs shadow-md transition-colors ${
+              canRaise
+                ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+            }`}
           >
             <Flame className="w-4 h-4" />
             <span>{levelNames[nextRaiseLevel]}</span>

@@ -39,10 +39,18 @@ export const CardSvg: React.FC<CardSvgProps> = ({
     return s === 'hearts' || s === 'diamonds' ? 'text-red-600' : 'text-slate-900';
   };
 
+  const suitNameGe: Record<Suit, string> = {
+    hearts: 'გული',
+    diamonds: 'აგური',
+    clubs: 'ჯვარი',
+    spades: 'ყვავი',
+  };
+
+  // Responsive, clamp-driven sizing (see .bura-card* in index.css).
   const dimensions = {
-    sm: 'w-12 h-18 text-xs',
-    md: 'w-16 h-24 sm:w-20 sm:h-28 text-sm',
-    lg: 'w-24 h-36 sm:w-28 sm:h-40 text-base',
+    sm: 'bura-card bura-card-sm text-xs',
+    md: 'bura-card bura-card-md text-sm',
+    lg: 'bura-card bura-card-lg text-base',
   }[size];
   const cornerText = {
     sm: 'text-[10px]',
@@ -64,6 +72,8 @@ export const CardSvg: React.FC<CardSvgProps> = ({
     return (
       <div
         onClick={onClick}
+        aria-hidden={!onClick}
+        aria-label={onClick ? 'დახურული კარტი' : undefined}
         className={`relative rounded-xl border-2 border-amber-900/40 bg-gradient-to-br from-amber-800 via-amber-900 to-amber-950 p-1.5 shadow-md transition-transform duration-200 select-none ${dimensions} ${className}`}
       >
         <div className="h-full w-full rounded-lg border border-amber-500/30 bg-[radial-gradient(#f59e0b_1px,transparent_1px)] [background-size:8px_8px] flex items-center justify-center">
@@ -78,13 +88,20 @@ export const CardSvg: React.FC<CardSvgProps> = ({
   const symbol = getSuitSymbol(card.suit);
   const colorClass = getSuitColor(card.suit);
 
+  const ariaLabel = `${card.rank} ${suitNameGe[card.suit]}${isTrump ? ' (კოზირი)' : ''}`;
+
   return (
     <div
       onClick={onClick}
-      className={`relative rounded-xl border bg-white p-1.5 shadow-md transition-all duration-200 select-none cursor-pointer ${dimensions} ${colorClass} ${
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
+      role={onClick ? 'button' : 'img'}
+      tabIndex={onClick ? 0 : undefined}
+      aria-label={ariaLabel}
+      aria-pressed={onClick ? selected : undefined}
+      className={`relative rounded-xl border bg-white p-1.5 shadow-md transition-all duration-200 select-none ${onClick ? 'cursor-pointer' : ''} ${dimensions} ${colorClass} ${
         selected
           ? '-translate-y-4 ring-4 ring-amber-400 shadow-xl z-20 border-amber-400'
-          : `hover:-translate-y-1 hover:shadow-lg ${isTrump ? 'border-amber-400 ring-1 ring-amber-300/70' : 'border-slate-200'}`
+          : `${onClick ? 'hover:-translate-y-1 hover:shadow-lg' : ''} ${isTrump ? 'border-amber-400 ring-1 ring-amber-300/70' : 'border-slate-200'}`
       } ${className}`}
     >
       {trumpMark && (

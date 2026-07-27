@@ -129,6 +129,9 @@ export class HostEngine {
       case 'SET_READY':
         this.room.setReady(uid, !!payload?.ready);
         break;
+      case 'MOVE_TO_TEAM':
+        this.room.moveToTeam(uid, payload?.targetUid || uid, payload?.team === 2 ? 2 : 1);
+        break;
       case 'START_GAME':
         this.room.startGame(uid);
         break;

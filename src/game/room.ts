@@ -9,6 +9,7 @@
  * Players are identified by their Firebase Auth uid (previously socket id).
  */
 import {
+  ActionErrorCode,
   Card,
   ChatMessage,
   GameState,
@@ -34,7 +35,7 @@ import {
 import { createSystemMessage } from './chat';
 
 type NewChat = Omit<ChatMessage, 'id'>;
-export type ActionResult = { success: boolean; error?: string };
+export type ActionResult = { success: boolean; error?: string; code?: ActionErrorCode };
 
 const WARNING_AFTER_MS = 15_000;
 // A player is considered present as long as a heartbeat arrived within this
@@ -109,6 +110,9 @@ export class BuraRoom {
       team2MatchScore: 0,
       currentRaiseLevel: 1,
       pendingRaise: null,
+      raiseEligibleTeam: null,
+      roundCardPlayed: false,
+      lastRaiseProposerId: null,
       roundNumber: 1,
       winningTeam: null,
       turnDeadline: null,
@@ -222,6 +226,65 @@ export class BuraRoom {
     return { success: true };
   }
 
+  /** Seats that belong to a team: team 1 = south/north, team 2 = west/east. */
+  private teamSeats(team: 1 | 2): PlayerPosition[] {
+    return team === 1 ? ['south', 'north'] : ['west', 'east'];
+  }
+
+  /** Both teams hold exactly two players (only meaningful for 4-player rooms). */
+  hasValidTeams(): boolean {
+    if (this.state.settings.playerCount !== 4) return true;
+    const t1 = this.state.players.filter((p) => p.team === 1).length;
+    const t2 = this.state.players.filter((p) => p.team === 2).length;
+    return t1 === 2 && t2 === 2;
+  }
+
+  /**
+   * Re-pair players before the game starts by moving `subjectUid` onto `team`.
+   * A player may move themselves; the host may move anyone. If the target team
+   * is full, the mover swaps seats with one of its members, so the 2-2 balance
+   * is always preserved. Only valid in the 4-player lobby.
+   */
+  moveToTeam(actorUid: string, subjectUid: string, team: 1 | 2): ActionResult {
+    const state = this.state;
+    if (state.phase !== 'LOBBY') return { success: false, error: 'თამაში უკვე დაწყებულია', code: 'GAME_ALREADY_STARTED' };
+    if (state.settings.playerCount !== 4) return { success: false, error: 'გუნდის შეცვლა მხოლოდ 2v2 რეჟიმში', code: 'INVALID_TEAM_COMPOSITION' };
+
+    const actor = state.players.find((p) => p.id === actorUid);
+    const subject = state.players.find((p) => p.id === subjectUid);
+    if (!actor || !subject) return { success: false, error: 'მოთამაშე ვერ მოიძებნა', code: 'PLAYER_NOT_IN_LOBBY' };
+    if (actorUid !== subjectUid && !actor.isHost) {
+      return { success: false, error: 'სხვისი გუნდის შეცვლა მხოლოდ ჰოსტს შეუძლია', code: 'PLAYER_NOT_IN_LOBBY' };
+    }
+    if (subject.team === team) return { success: true };
+
+    const seats = this.teamSeats(team);
+    const occupant = state.players.find((p) => p.id !== subject.id && seats.includes(p.position));
+    const openSeat = seats.find((s) => !state.players.some((p) => p.position === s));
+
+    const fromPos = subject.position;
+    const fromTeam = subject.team;
+
+    if (openSeat) {
+      subject.position = openSeat;
+      subject.team = team;
+    } else if (occupant) {
+      // Team is full — swap the subject with a member of the target team.
+      subject.position = occupant.position;
+      subject.team = team;
+      occupant.position = fromPos;
+      occupant.team = fromTeam;
+      occupant.isReady = false;
+    } else {
+      return { success: false, error: 'გუნდი სავსეა', code: 'TEAM_FULL' };
+    }
+
+    // Changing a pairing invalidates readiness — players re-confirm the new team.
+    subject.isReady = false;
+    this.say(`${subject.name} გადავიდა გუნდ ${team}-ში`, 'join');
+    return { success: true };
+  }
+
   startGame(uid: string): ActionResult {
     const state = this.state;
     const player = state.players.find((p) => p.id === uid);
@@ -230,6 +293,9 @@ export class BuraRoom {
     const required = state.settings.playerCount;
     if (state.players.length !== required) {
       return { success: false, error: `თამაშის დასაწყებად საჭიროა ზუსტად ${required} მოთამაშე` };
+    }
+    if (!this.hasValidTeams()) {
+      return { success: false, error: 'ორივე გუნდში ზუსტად ორი მოთამაშე უნდა იყოს', code: 'INVALID_TEAM_COMPOSITION' };
     }
     if (!state.players.every((p) => p.isReady || p.isHost)) {
       return { success: false, error: 'ყველა მოთამაშე უნდა იყოს მზად' };
@@ -432,7 +498,7 @@ export class BuraRoom {
 
     const player = state.players.find((p) => p.id === uid);
     if (!player || player.position !== state.currentTurnPosition) {
-      return { success: false, error: 'თქვენი სვლა არ არის' };
+      return { success: false, error: 'თქვენი სვლა არ არის', code: 'NOT_YOUR_TURN' };
     }
 
     const playerHand = this.hands.get(uid) || [];
@@ -459,6 +525,9 @@ export class BuraRoom {
         state.currentTempWinnerPosition = player.position;
       }
     }
+
+    // First card of the round locks the offer window: no raises after play starts.
+    state.roundCardPlayed = true;
 
     const remaining = playerHand.filter((c) => !cardIds.includes(c.id));
     this.hands.set(uid, remaining);
@@ -572,12 +641,43 @@ export class BuraRoom {
     }
   }
 
+  /** True when `team` is currently allowed to propose the next raise level. */
+  canTeamRaise(team: 1 | 2): boolean {
+    const state = this.state;
+    if (state.phase !== 'TURN_IN_PROGRESS') return false;
+    if (state.roundCardPlayed) return false;
+    if (state.currentRaiseLevel >= 6) return false;
+    if (state.raiseEligibleTeam !== null && state.raiseEligibleTeam !== team) return false;
+    return true;
+  }
+
   proposeRaise(uid: string, level: RaiseLevel): ActionResult {
     const state = this.state;
-    if (state.phase !== 'TURN_IN_PROGRESS') return { success: false, error: 'დავი მხოლოდ თამაშისას' };
     const player = state.players.find((p) => p.id === uid);
-    if (!player) return { success: false, error: 'მოთამაშე ვერ მოიძებნა' };
-    if (level <= state.currentRaiseLevel) return { success: false, error: 'გაზრდა უფრო მაღალი უნდა იყოს' };
+    if (!player) return { success: false, error: 'მოთამაშე ვერ მოიძებნა', code: 'STALE_GAME_STATE' };
+
+    if (state.phase === 'RAISE_OFFER_PENDING' || state.pendingRaise) {
+      return { success: false, error: 'უკვე არსებობს გახსნილი შეთავაზება', code: 'OFFER_ALREADY_PENDING' };
+    }
+    if (state.phase !== 'TURN_IN_PROGRESS') {
+      return { success: false, error: 'შეთავაზება მხოლოდ თამაშისას', code: 'STALE_GAME_STATE' };
+    }
+    // Once a card is on the table the offer window is closed for the whole round.
+    if (state.roundCardPlayed) {
+      return { success: false, error: 'კარტის ჩამოსვლის შემდეგ შეთავაზებას ვეღარ გამოაცხადებ', code: 'CARD_ALREADY_PLAYED' };
+    }
+    // Only the next level up may be proposed (davi→se→chari→…).
+    if (level !== state.currentRaiseLevel + 1) {
+      return { success: false, error: 'უნდა გამოაცხადოთ მხოლოდ მომდევნო დონე', code: 'INVALID_RAISE_LEVEL' };
+    }
+    // Team alternation: the same team cannot declare two consecutive levels.
+    if (!this.canTeamRaise(player.team)) {
+      return {
+        success: false,
+        error: 'შემდეგი შეთავაზების გამოცხადება მხოლოდ მოწინააღმდეგე გუნდს შეუძლია',
+        code: 'NOT_ELIGIBLE_TO_RAISE',
+      };
+    }
 
     state.phase = 'RAISE_OFFER_PENDING';
     state.pendingRaise = {
@@ -586,6 +686,7 @@ export class BuraRoom {
       level,
       timestamp: Date.now(),
     };
+    state.lastRaiseProposerId = uid;
     const names: Record<number, string> = {
       2: 'დავი (2 ქულა)', 3: 'სე (3 ქულა)', 4: 'ჩარი (4 ქულა)', 5: 'ფანჯი (5 ქულა)', 6: 'შაში (6 ქულა)',
     };
@@ -596,15 +697,18 @@ export class BuraRoom {
   respondRaise(uid: string, accept: boolean): ActionResult {
     const state = this.state;
     if (state.phase !== 'RAISE_OFFER_PENDING' || !state.pendingRaise) {
-      return { success: false, error: 'აქტიური შეთავაზება არ არის' };
+      return { success: false, error: 'აქტიური შეთავაზება არ არის', code: 'STALE_GAME_STATE' };
     }
     const player = state.players.find((p) => p.id === uid);
     if (!player || player.team === state.pendingRaise.proposedByTeam) {
-      return { success: false, error: 'მხოლოდ მოწინააღმდეგე გუნდს შეუძლია პასუხი' };
+      return { success: false, error: 'მხოლოდ მოწინააღმდეგე გუნდს შეუძლია პასუხი', code: 'NOT_ELIGIBLE_TO_RESPOND' };
     }
 
     if (accept) {
       state.currentRaiseLevel = state.pendingRaise.level;
+      // The team that just accepted now holds the right to escalate next; the
+      // proposing team can never declare two levels in a row.
+      state.raiseEligibleTeam = player.team;
       state.pendingRaise = null;
       state.phase = 'TURN_IN_PROGRESS';
       this.startTurnTimer();
