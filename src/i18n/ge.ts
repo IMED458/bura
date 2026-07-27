@@ -62,6 +62,7 @@ export const ge = {
   trickTakenBy: 'ხელი წაიღო',
   cardsWord: 'კარტი',
   deckLabel: 'დასტა',
+  deckRemainingLabel: 'დარჩა დასტაში',
   doubleClickHint: 'ორმაგი დაწკაპუნება — კარტის დადება',
   turnWarning: 'გაფრთხილება — დროა ჩამოხვიდე',
   autoPlayPending: 'კავშირი გაწყვეტილია — ავტომატური სვლა მზადდება',

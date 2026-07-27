@@ -264,9 +264,12 @@ export const Table: React.FC<TableProps> = ({
             <span>{ge.trump}</span>
           </div>
           <span className="text-[9px] text-rose-100/70">{SUIT_NAME[state.trumpSuit]}</span>
-          <div className="mt-0.5 flex items-center gap-1 text-[10px] font-bold text-amber-100 bg-black/40 rounded-full px-2 py-0.5 border border-white/10">
-            <Layers className="w-3 h-3" />
-            <span>{ge.deckLabel}: {state.deckRemainingCount}</span>
+          <div className="mt-1 flex flex-col items-center gap-0.5 bg-black/45 rounded-xl px-2.5 py-1 border border-white/15">
+            <div className="flex items-center gap-1 text-amber-100">
+              <Layers className="w-3.5 h-3.5" />
+              <span className="text-sm font-black leading-none">{state.deckRemainingCount}</span>
+            </div>
+            <span className="text-[8px] text-rose-100/70 leading-none">{ge.deckRemainingLabel}</span>
           </div>
         </div>
       )}
