@@ -209,16 +209,38 @@ export class HostEngine {
 
   private async updateMatchmaking() {
     const st = this.room.state;
-    const open = st.phase === 'LOBBY' && st.players.length < st.settings.playerCount;
+    // Advertise only rooms that another searcher can actually join: still in the
+    // lobby, not full, and with at least one live player.
+    const open = st.phase === 'LOBBY' && st.players.length > 0 && st.players.length < st.settings.playerCount;
     if (open) {
+      // Keep the original createdAt stable so matchmaking can order by "oldest
+      // open room" and reconcile simultaneous searches deterministically.
+      const existing = await getDoc(this.mmRef());
+      const createdAt = existing.exists() ? existing.data().createdAt || Date.now() : Date.now();
       await setDoc(this.mmRef(), clean({
+        code: this.code,
         mode: st.settings.playerCount,
         count: st.players.length,
-        createdAt: Date.now(),
+        createdAt,
+        updatedAt: Date.now(),
       }));
     } else {
       await deleteDoc(this.mmRef()).catch(() => {});
     }
+  }
+
+  /** Tear down the whole room (host leaving an unstarted/dead room). Removes the
+   *  matchmaking advert and the public room doc so no one joins a hostless room. */
+  async destroy(): Promise<void> {
+    this.stop();
+    await deleteDoc(this.mmRef()).catch(() => {});
+    await deleteDoc(this.roomRef()).catch(() => {});
+  }
+
+  /** Public, still in the lobby — safe to garbage-collect when the host leaves. */
+  isPublicLobby(): boolean {
+    const st = this.room.state;
+    return !st.isPrivate && st.phase === 'LOBBY';
   }
 
   /** Rehydrate a HostEngine from Firestore (host tab reloaded mid-game). */
