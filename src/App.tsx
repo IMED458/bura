@@ -10,6 +10,7 @@ import { ChatDrawer } from './components/ChatDrawer';
 import { DaviModal } from './components/DaviModal';
 import { GameOverModal } from './components/GameOverModal';
 import { HowToPlayModal } from './components/HowToPlayModal';
+import { ToastNotifications, Toast } from './components/Toasts';
 import { soundEffects } from './utils/audio';
 import { ge } from './i18n/ge';
 import { MessageSquare, Volume2, VolumeX, BookOpen, LogOut } from 'lucide-react';
@@ -33,6 +34,9 @@ export default function App() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isHowToPlayOpen, setIsHowToPlayOpen] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const seenToastIds = useRef<Set<string>>(new Set());
+  const toastsInitialized = useRef(false);
 
   const clientRef = useRef<GameClient | null>(null);
   const isChatOpenRef = useRef(isChatOpen);
@@ -102,6 +106,31 @@ export default function App() {
     return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVisible); };
   }, [!!gameState]);
 
+  // Surface important game events as transient toasts. On the first chat load
+  // we mark existing history as "seen" so old messages don't flood the screen.
+  useEffect(() => {
+    const toastTypes = new Set(['davi', 'round_win', 'trick_win', 'bura', 'join', 'leave']);
+    if (!toastsInitialized.current) {
+      chat.forEach((m) => seenToastIds.current.add(m.id));
+      toastsInitialized.current = true;
+      return;
+    }
+    const fresh = chat.filter(
+      (m) => m.isSystem && m.type && toastTypes.has(m.type) && !seenToastIds.current.has(m.id)
+    );
+    if (!fresh.length) return;
+    fresh.forEach((m) => seenToastIds.current.add(m.id));
+    const newToasts: Toast[] = fresh.slice(-3).map((m) => ({
+      id: m.id,
+      text: m.text,
+      kind: (m.type as Toast['kind']) || 'info',
+    }));
+    setToasts((prev) => [...prev, ...newToasts].slice(-3));
+    newToasts.forEach((t) => {
+      setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== t.id)), 3800);
+    });
+  }, [chat]);
+
   const selectMode = (m: PlayerCount) => {
     setMode(m);
     localStorage.setItem('bura_mode', String(m));
@@ -114,6 +143,9 @@ export default function App() {
     setUnreadCount(0);
     prevChatLen.current = 0;
     prevPhase.current = null;
+    setToasts([]);
+    seenToastIds.current = new Set();
+    toastsInitialized.current = false;
   };
 
   const withBusy = async (fn: () => Promise<void>) => {
@@ -146,6 +178,7 @@ export default function App() {
   const myPlayer = gameState?.players.find((p) => p.id === myPlayerId);
 
   const handleToggleReady = () => clientRef.current?.toggleReady(!(myPlayer?.isReady));
+  const handleMoveToTeam = (targetUid: string, team: 1 | 2) => clientRef.current?.moveToTeam(targetUid, team);
   const handleStartGame = () => clientRef.current?.startGame();
   const handleNextRound = () => clientRef.current?.nextRound();
   const handleNewMatch = () => clientRef.current?.newMatch();
@@ -226,7 +259,9 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex-1 p-3 sm:p-6 flex flex-col justify-center max-w-5xl w-full mx-auto relative">
+      <ToastNotifications toasts={toasts} />
+
+      <main className="flex-1 p-3 sm:p-6 flex flex-col justify-center max-w-6xl w-full mx-auto relative">
         {errorMsg && (
           <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-red-950 border border-red-800 text-red-200 text-xs px-4 py-2.5 rounded-2xl shadow-2xl font-medium animate-bounce">
             {errorMsg}
@@ -256,6 +291,7 @@ export default function App() {
             onToggleReady={handleToggleReady}
             onStartGame={handleStartGame}
             onLeaveRoom={handleLeaveRoom}
+            onMoveToTeam={handleMoveToTeam}
           />
         ) : (
           <div className="flex flex-col gap-4">
@@ -288,7 +324,10 @@ export default function App() {
               deckRemainingCount={gameState.deckRemainingCount}
               players={gameState.players}
               onProposeRaise={handleProposeRaise}
-              canRaise={gameState.phase === 'TURN_IN_PROGRESS'}
+              phase={gameState.phase}
+              myTeam={myPlayer?.team}
+              raiseEligibleTeam={gameState.raiseEligibleTeam}
+              roundCardPlayed={gameState.roundCardPlayed}
             />
           </div>
         )}

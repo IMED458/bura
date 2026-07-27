@@ -16,3 +16,90 @@ body {
   margin: 0;
   overflow-x: hidden;
 }
+
+/* ---- Focus & accessibility ------------------------------------------------ */
+:focus-visible {
+  outline: 3px solid #fbbf24;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ---- Responsive card sizing ---------------------------------------------- */
+/* A single source of truth for card dimensions; every card scales with the
+   viewport so nothing clips on small screens and cards stay legible on big
+   ones. Aspect ratio is fixed to a real playing-card 2.5 : 3.5. */
+:root {
+  --card-w-sm: clamp(34px, 8vw, 54px);
+  --card-w-md: clamp(46px, 11vw, 78px);
+  --card-w-lg: clamp(58px, 14vw, 96px);
+}
+
+.bura-card {
+  aspect-ratio: 2.5 / 3.5;
+}
+.bura-card-sm { width: var(--card-w-sm); }
+.bura-card-md { width: var(--card-w-md); }
+.bura-card-lg { width: var(--card-w-lg); }
+
+/* ---- The felt table ------------------------------------------------------- */
+.bura-table {
+  width: min(96vw, 1500px, 100%);
+  height: min(78vh, 900px);
+  min-height: 560px;
+  margin-inline: auto;
+  /* Layered: felt dot texture on top of the wine-red radial gradient. Both
+     live in a single declaration so nothing overrides the red. */
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    radial-gradient(ellipse at 50% 40%, #c42638 0%, #a11f30 40%, #821728 72%, #611022 100%);
+  background-size: 20px 20px, 100% 100%;
+  box-shadow:
+    inset 0 0 70px 8px rgba(60, 6, 14, 0.55),
+    inset 0 2px 0 0 rgba(255, 255, 255, 0.09),
+    0 30px 60px -20px rgba(0, 0, 0, 0.85);
+}
+/* Kept for markup compatibility; the texture now lives in .bura-table. */
+.bura-table-felt { }
+
+/* ---- Animations ----------------------------------------------------------- */
+@keyframes bura-fade-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.animate-fade-in { animation: bura-fade-in 220ms ease-out both; }
+
+/* Card dealt from a seat toward the table centre. The outer slot fixes the
+   resting position; this inner layer only animates the incoming motion. */
+@keyframes bura-deal-south { from { opacity: 0; transform: translateY(70px) scale(0.55); } to { opacity: 1; transform: none; } }
+@keyframes bura-deal-north { from { opacity: 0; transform: translateY(-70px) scale(0.55); } to { opacity: 1; transform: none; } }
+@keyframes bura-deal-west  { from { opacity: 0; transform: translateX(-90px) scale(0.55); } to { opacity: 1; transform: none; } }
+@keyframes bura-deal-east  { from { opacity: 0; transform: translateX(90px) scale(0.55); } to { opacity: 1; transform: none; } }
+
+.deal-from-south { animation: bura-deal-south 360ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.deal-from-north { animation: bura-deal-north 360ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.deal-from-west  { animation: bura-deal-west 360ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.deal-from-east  { animation: bura-deal-east 360ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes bura-turn-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.55); }
+  50% { box-shadow: 0 0 0 6px rgba(251, 191, 36, 0); }
+}
+.bura-turn-active { animation: bura-turn-glow 1.8s ease-in-out infinite; }
+
+@keyframes bura-toast-in {
+  from { opacity: 0; transform: translateY(-14px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+.animate-toast-in { animation: bura-toast-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* ---- Reduced motion ------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

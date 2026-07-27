@@ -202,6 +202,7 @@ export class GameClient {
   }
 
   toggleReady(ready: boolean) { return this.sendAction('SET_READY', { ready }); }
+  moveToTeam(targetUid: string, team: 1 | 2) { return this.sendAction('MOVE_TO_TEAM', { targetUid, team }); }
   startGame() { return this.sendAction('START_GAME'); }
   nextRound() { return this.sendAction('NEXT_ROUND'); }
   newMatch() { return this.sendAction('NEW_MATCH'); }
