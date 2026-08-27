@@ -10,6 +10,7 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -24,6 +25,7 @@ import {
 import { Auth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { HostEngine } from './host';
 import { BuraRoom } from '../game/room';
+import { isRoomJoinable, pickSeniorAdvert, sortOpenCandidates } from './matchmaking';
 import { Card, ChatMessage, GameState, PlayerCount, RaiseLevel, RoomSettings } from '../types/game';
 
 export interface FbCtx {
@@ -44,6 +46,8 @@ export class GameClient {
   private cb: RoomCallbacks;
   private host: HostEngine | null = null;
   private unsubs: Unsubscribe[] = [];
+  private mmReconcileUnsub: Unsubscribe | null = null;
+  private reconciling = false;
   code: string | null = null;
 
   constructor(cb: RoomCallbacks, ctx: FbCtx) {
@@ -141,14 +145,105 @@ export class GameClient {
 
   async startMatchmaking(name: string, mode: PlayerCount): Promise<void> {
     await this.init();
-    const q = query(collection(this.db, 'matchmaking'), where('mode', '==', mode));
-    const snap = await getDocs(q);
-    const open = snap.docs.find((d) => (d.data().count || 0) < mode);
-    if (open) {
-      await this.joinRoom(open.id, name, true);
-    } else {
-      await this.createRoom(name, { playerCount: mode }, false);
+    // Try to join the oldest genuinely-open public room first.
+    const joined = await this.tryJoinOpenRoom(name, mode);
+    if (joined) return;
+    // Otherwise open our own public room and start reconciling, so if another
+    // searcher created one at the same moment the two rooms merge into one.
+    const code = await this.createRoom(name, { playerCount: mode }, false);
+    this.startMatchmakingReconcile(name, mode, code);
+  }
+
+  /** Read the matchmaking board, skipping/cleaning dead entries, and join the
+   *  oldest room that is really joinable. Returns true if we joined one. */
+  private async tryJoinOpenRoom(name: string, mode: PlayerCount): Promise<boolean> {
+    const snap = await getDocs(query(collection(this.db, 'matchmaking'), where('mode', '==', mode)));
+    const candidates = sortOpenCandidates(
+      snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })),
+      mode
+    );
+
+    for (const c of candidates) {
+      if (c.id === this.code) continue;
+      const roomSnap = await getDoc(doc(this.db, 'rooms', c.id));
+      if (!roomSnap.exists()) {
+        // Advert points at a room that no longer exists — clean it up.
+        await deleteDoc(doc(this.db, 'matchmaking', c.id)).catch(() => {});
+        continue;
+      }
+      if (!isRoomJoinable(roomSnap.data() as any, this.uid)) continue;
+      await this.joinRoom(c.id, name, true);
+      return true;
     }
+    return false;
+  }
+
+  /** While waiting alone in our freshly-created public room, watch the board and
+   *  merge into an older open room if one shows up (simultaneous-search race). */
+  private startMatchmakingReconcile(name: string, mode: PlayerCount, myCode: string) {
+    this.stopReconcile();
+
+    this.mmReconcileUnsub = onSnapshot(
+      query(collection(this.db, 'matchmaking'), where('mode', '==', mode)),
+      async () => {
+        if (this.reconciling) return;
+        if (!this.host || this.code !== myCode) { this.stopReconcile(); return; }
+
+        const mySnap = await getDoc(doc(this.db, 'rooms', myCode));
+        if (!mySnap.exists()) { this.stopReconcile(); return; }
+        const myst = mySnap.data() as any;
+        // Only merge while we are still a lone host in the lobby.
+        if (myst.phase !== 'LOBBY' || (myst.players || []).length !== 1) { this.stopReconcile(); return; }
+
+        const myMm = await getDoc(doc(this.db, 'matchmaking', myCode));
+        const myCreatedAt = myMm.exists() ? myMm.data().createdAt || 0 : 0;
+
+        const boardSnap = await getDocs(query(collection(this.db, 'matchmaking'), where('mode', '==', mode)));
+        const older = pickSeniorAdvert(
+          boardSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })),
+          mode,
+          myCode,
+          myCreatedAt
+        );
+        if (!older) return;
+
+        const oSnap = await getDoc(doc(this.db, 'rooms', older.id));
+        if (!isRoomJoinable(oSnap.exists() ? (oSnap.data() as any) : null, this.uid)) return;
+
+        // Abandon our room and join the senior one.
+        this.reconciling = true;
+        this.stopReconcile();
+        await this.destroyMyRoom();
+        await this.joinRoom(older.id, name, true);
+        if (!this.code) {
+          // The senior room filled up before we got in — reopen our own room
+          // and keep reconciling so we still end up matched.
+          const code = await this.createRoom(name, { playerCount: mode }, false);
+          this.reconciling = false;
+          this.startMatchmakingReconcile(name, mode, code);
+          return;
+        }
+        this.reconciling = false;
+      }
+    );
+  }
+
+  private stopReconcile() {
+    if (this.mmReconcileUnsub) { this.mmReconcileUnsub(); this.mmReconcileUnsub = null; }
+  }
+
+  /** Tear down the room this client hosts (used when merging or leaving a
+   *  still-empty public lobby) so no hostless room lingers in matchmaking. */
+  private async destroyMyRoom() {
+    const code = this.code;
+    this.unsubClearRoom();
+    if (this.host) { await this.host.destroy(); this.host = null; }
+    else if (code) { await deleteDoc(doc(this.db, 'rooms', code)).catch(() => {}); }
+    if (code) {
+      await deleteDoc(doc(this.db, 'matchmaking', code)).catch(() => {});
+      localStorage.removeItem('bura_room_code');
+    }
+    this.code = null;
   }
 
   private subscribe(code: string) {
@@ -182,6 +277,7 @@ export class GameClient {
   }
 
   disconnectLocal() {
+    this.stopReconcile();
     this.unsubClearRoom();
     if (this.host) { this.host.stop(); this.host = null; }
     this.code = null;
@@ -225,7 +321,16 @@ export class GameClient {
   }
 
   async leave() {
-    if (this.code) await this.sendAction('LEAVE').catch(() => {});
+    this.stopReconcile();
+    // If we host a still-unstarted public room, delete it outright so it stops
+    // being advertised to matchmaking as a joinable (but hostless) room.
+    if (this.host && this.host.isPublicLobby()) {
+      await this.host.destroy().catch(() => {});
+      this.host = null;
+      if (this.code) await deleteDoc(doc(this.db, 'matchmaking', this.code)).catch(() => {});
+    } else if (this.code) {
+      await this.sendAction('LEAVE').catch(() => {});
+    }
     localStorage.removeItem('bura_room_code');
     this.disconnectLocal();
   }

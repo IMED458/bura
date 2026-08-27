@@ -9,6 +9,7 @@ import { ScoreBoard } from './components/ScoreBoard';
 import { ChatDrawer } from './components/ChatDrawer';
 import { DaviModal } from './components/DaviModal';
 import { GameOverModal } from './components/GameOverModal';
+import { RoundResult } from './components/RoundResult';
 import { HowToPlayModal } from './components/HowToPlayModal';
 import { ToastNotifications, Toast } from './components/Toasts';
 import { soundEffects } from './utils/audio';
@@ -312,6 +313,7 @@ export default function App() {
               onPlayCards={handlePlayCards}
               onDeclareBura={handleDeclareBura}
               onDeclareMolodka={handleDeclareMolodka}
+              onProposeRaise={handleProposeRaise}
             />
 
             <ScoreBoard
@@ -341,11 +343,17 @@ export default function App() {
           />
         )}
 
-        {gameState && (gameState.phase === 'ROUND_FINISHED' || gameState.phase === 'MATCH_FINISHED') && (
+        {/* Hand finished but match still going: show the captured-points result
+            briefly while the host deals the next round automatically. */}
+        {gameState && gameState.phase === 'ROUND_FINISHED' && <RoundResult state={gameState} />}
+
+        {/* Only the whole match ending is a hard stop; individual rounds continue
+            automatically (the host deals the next round), so no button needed. */}
+        {gameState && gameState.phase === 'MATCH_FINISHED' && (
           <GameOverModal
             state={gameState}
             myPlayerId={myPlayerId}
-            onRematch={gameState.phase === 'ROUND_FINISHED' ? handleNextRound : handleNewMatch}
+            onRematch={handleNewMatch}
             onBackToLobby={handleLeaveRoom}
           />
         )}

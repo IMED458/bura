@@ -61,6 +61,9 @@ export const ge = {
   emptySeat: 'ცარიელი ადგილი',
   trickTakenBy: 'ხელი წაიღო',
   cardsWord: 'კარტი',
+  deckLabel: 'დასტა',
+  deckRemainingLabel: 'დარჩა დასტაში',
+  doubleClickHint: 'ორმაგი დაწკაპუნება — კარტის დადება',
   turnWarning: 'გაფრთხილება — დროა ჩამოხვიდე',
   autoPlayPending: 'კავშირი გაწყვეტილია — ავტომატური სვლა მზადდება',
   // Short raise labels keyed by raise level.
@@ -79,6 +82,7 @@ export const ge = {
   raiseOnlyOpponent: '„{name}" გამოცხადება მხოლოდ მოწინააღმდეგე გუნდს შეუძლია',
   raiseAfterCard: 'კარტის ჩამოსვლის შემდეგ შეთავაზებას ვეღარ გამოაცხადებ',
   declareNext: '{name} გამოცხადება',
+  declareVerb: 'გამოცხადება',
 
   // Team switcher (lobby)
   teamSwitchTitle: 'გუნდები და წყვილები',

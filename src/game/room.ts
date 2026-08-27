@@ -571,7 +571,9 @@ export class BuraRoom {
     if (winningTeam === 1) state.team1TakenCardCount += takenCards;
     else state.team2TakenCardCount += takenCards;
 
-    this.say(`${winner?.name || winnerPos} მოიგო ხელი (+${points} ქულა)`, 'trick_win');
+    // During play we only announce WHO took the trick — never how many points,
+    // so the point tally stays hidden until the hand (round) finishes.
+    this.say(`${winner?.name || winnerPos}-მ წაიღო ხელი`, 'trick_win');
 
     state.currentTrickCards = [];
     state.requiredCardCount = 0;
@@ -647,7 +649,10 @@ export class BuraRoom {
     if (state.phase !== 'TURN_IN_PROGRESS') return false;
     if (state.roundCardPlayed) return false;
     if (state.currentRaiseLevel >= 6) return false;
-    if (state.raiseEligibleTeam !== null && state.raiseEligibleTeam !== team) return false;
+    // `?? null` so a state persisted before this field existed (undefined) is
+    // treated as "either team may open", not as "nobody is eligible".
+    const eligible = state.raiseEligibleTeam ?? null;
+    if (eligible !== null && eligible !== team) return false;
     return true;
   }
 
