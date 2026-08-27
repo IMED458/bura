@@ -125,10 +125,10 @@ export const Table: React.FC<TableProps> = ({
   // Offer (davi / se / chari …) eligibility — offers only at the top of the
   // round and only by the team allowed to escalate next.
   const myTeam = myPlayer?.team;
+  const eligibleTeam = state.raiseEligibleTeam ?? null; // undefined (old state) => either team
   const raiseWindowOpen =
     state.phase === 'TURN_IN_PROGRESS' && !state.roundCardPlayed && state.currentRaiseLevel < 6;
-  const teamEligibleToRaise =
-    state.raiseEligibleTeam === null || state.raiseEligibleTeam === myTeam;
+  const teamEligibleToRaise = eligibleTeam === null || eligibleTeam === myTeam;
   const nextRaiseLevel = state.currentRaiseLevel + 1;
   const canProposeRaise = raiseWindowOpen && teamEligibleToRaise;
   const raiseDisabledReason = !teamEligibleToRaise
